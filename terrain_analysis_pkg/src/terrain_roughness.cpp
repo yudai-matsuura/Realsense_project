@@ -1,4 +1,4 @@
-#include terrain_analysis_pkg/terrain_rouhgness.hpp
+#include "terrain_analysis_pkg/terrain_roughness.hpp"
 
 TerrainRoughness::TerrainRoughness():Node("terrain_roughness") {
     std::cout << "TerrainRoughness class is establishes." << std::endl;
@@ -16,7 +16,7 @@ void TerrainRoughness::pointCloudCallback(const sensor_msgs::msg::PointCloud2::S
     if(cloud->empty()) return;
 
     // Normal estimation
-    pcl::NormalEstimation<pcl::PointXYZ. pcl::Normal> ne;   
+    pcl::NormalEstimation<pcl::PointXYZ. pcl::Normal> ne;
     ne.SetInputCloud(cloud);
     pcl::searh::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ());
     ne.setSearchMethod(tree):
