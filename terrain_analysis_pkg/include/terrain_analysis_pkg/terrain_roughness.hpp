@@ -11,9 +11,8 @@
 #include <pcl/point_types.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/search/kdtree.h>
-#include <protocols/filters/...>
 
-class TerrainRoughness :: public rclcpp::Node
+class TerrainRoughness : public rclcpp::Node
 {
 public:
     TerrainRoughness();
