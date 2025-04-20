@@ -3,11 +3,11 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    terrain_analysis = Node(
-        package="terrain_analysis",
-        executable="terrain_analysis",
-        name="terrain_analysis",
-        output="screen"
-    )
-
-    return LaunchDescription(terrain_analysis)
+    return LaunchDescription([
+        Node(
+            package="lbr_terrain_analysis",
+            executable="lbr_terrain_analysis_node",
+            name="lbr_terrain_analysis",
+            output="screen"
+        )
+    ])
