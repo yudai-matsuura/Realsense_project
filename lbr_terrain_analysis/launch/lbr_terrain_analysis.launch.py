@@ -2,13 +2,13 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 def generate_launch_description():
-    terrain_roughness = Node(
+    terrain_analysis = Node(
         package = 'terrain_analysis',
-        executable = 'terrain_roughness',
-        name = 'terrain_roughness',
+        executable = 'terrain_analysis',
+        name = 'terrain_analysis',
         output = 'screen'
     )
 
     return LaunchDescription([
-        terrain_roughness
+        terrain_analysis
     ])
