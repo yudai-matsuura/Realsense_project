@@ -94,7 +94,7 @@ void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::Sh
   marker.color.g = 1.0;
   marker.color.b = 0.0;
 
-  const int step = 10; // visualize every 10th normal
+  const int step = 1000; // visualize every 10th normal
 
   for (size_t i = 0; i < cloud->points.size(); i += step) {
     if (!std::isfinite(normals->points[i].normal_x)) continue;
