@@ -31,6 +31,9 @@
 
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <visualization_msgs/msg/marker.hpp>
+#include <geometry_msgs/msg/point.hpp>
+
 
 #include "lbr_terrain_analysis/visibility_control.h"
 
