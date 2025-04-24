@@ -49,6 +49,9 @@ private:
   void pointCloudCallback(
     const sensor_msgs::msg::PointCloud2::SharedPtr msg);
 
+  // Publisher
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
+
   // Subscriber
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_sub_;
 };

@@ -24,7 +24,9 @@ TerrainAnalysis::TerrainAnalysis(const rclcpp::NodeOptions & options)
 : rclcpp::Node("lbr_terrain_analysis", options)
 {
   std::cout << "TerrainAnalysis class is established." << std::endl;
-  //Subscriber
+  // Publisher
+  marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("normal_markers", 10);
+  // Subscriber
   point_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
     std::bind(&TerrainAnalysis::pointCloudCallback, this, std::placeholders::_1));
@@ -69,6 +71,37 @@ void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::Sh
   double stddev = std::sqrt((angle_sum_sq / normal_count) - (mean * mean));
 
   RCLCPP_INFO(this->get_logger(), "Normal stddev: %.4f rad", stddev);
+
+  visualization_msg::msg::Marker marker;
+  marker.header.frame_id = msg->header.frame_id;
+  marker.header.stamp = this->now();
+  marker.ns = "normals";
+  marker.id = 0;
+  marker.type = visualization_msgs::msg::Marker::LINE_LIST;
+  marker.action = visualization_msgs::msg::Marker::ADD;
+  marker.scale.x = 0.002; // width of line
+  marker.color.a = 1.0;
+  marker.color.r = 0.0;
+  marker.color.g = 1.0;
+  marker.color.b = 0.0;
+
+  for (size_t i = 0; i < cloud->point.size(); ++i) {
+    if (!std::isfinite(normals->points[i].normal_x)) continue;
+
+    geometry_msgs::msg::Point p_start, p_end;
+    p_start.x = cloud->points[i].x;
+    p_start.y = cloud->points[i].y;
+    p_start.z = cloud->points[i].z;
+
+    p_end.x = p_start.x + 0.05 * normals->points[i].normal_x;
+    p_end.y = p_start.y + 0.05 * normals->points[i].normal_y;
+    p_end.z = p_start.z + 0.05 * normals->points[i].normal_z;
+  
+    marker.points.push_back(p_start);
+    marker.points.push_back(p_end);
+  }
+
+  marker_pub_->publish(marker);
 
 }
 
