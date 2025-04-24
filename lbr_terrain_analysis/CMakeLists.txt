@@ -7,6 +7,9 @@ endif()
 
 # find dependencies
 find_package(ament_cmake_auto REQUIRED)
+find_package(visualization_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+
 ament_auto_find_build_dependencies()
 
 ament_auto_add_library(lbr_terrain_analysis src/lbr_terrain_analysis.cpp)

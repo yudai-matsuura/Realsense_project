@@ -72,7 +72,7 @@ void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::Sh
 
   RCLCPP_INFO(this->get_logger(), "Normal stddev: %.4f rad", stddev);
 
-  visualization_msg::msg::Marker marker;
+  visualization_msgs::msg::Marker marker;
   marker.header.frame_id = msg->header.frame_id;
   marker.header.stamp = this->now();
   marker.ns = "normals";
@@ -85,7 +85,7 @@ void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::Sh
   marker.color.g = 1.0;
   marker.color.b = 0.0;
 
-  for (size_t i = 0; i < cloud->point.size(); ++i) {
+  for (size_t i = 0; i < cloud->points.size(); ++i) {
     if (!std::isfinite(normals->points[i].normal_x)) continue;
 
     geometry_msgs::msg::Point p_start, p_end;
@@ -96,7 +96,7 @@ void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::Sh
     p_end.x = p_start.x + 0.05 * normals->points[i].normal_x;
     p_end.y = p_start.y + 0.05 * normals->points[i].normal_y;
     p_end.z = p_start.z + 0.05 * normals->points[i].normal_z;
-  
+
     marker.points.push_back(p_start);
     marker.points.push_back(p_end);
   }
