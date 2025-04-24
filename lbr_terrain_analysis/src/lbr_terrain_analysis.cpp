@@ -44,6 +44,15 @@ void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::Sh
   pcl::fromROSMsg(*msg, *cloud);
   if(cloud->empty()) return;
 
+  // Downsample the point cloud
+  pcl::VoxelGrid<pcl::PointXYZ> sor;
+  sor.setInputCloud(cloud);
+  sor.setLeafSize(0.02f, 0.02f, 0.02f); // 2cm voxel
+  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  sor.filter(*filtered_cloud);
+
+  if(filtered_cloud->empty()) return;
+
   // Normal estimation
   pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
   ne.setInputCloud(cloud);
@@ -85,7 +94,9 @@ void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::Sh
   marker.color.g = 1.0;
   marker.color.b = 0.0;
 
-  for (size_t i = 0; i < cloud->points.size(); ++i) {
+  const int step = 10; // visualize every 10th normal
+
+  for (size_t i = 0; i < cloud->points.size(); i += step) {
     if (!std::isfinite(normals->points[i].normal_x)) continue;
 
     geometry_msgs::msg::Point p_start, p_end;

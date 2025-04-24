@@ -26,6 +26,7 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/search/kdtree.h>
+#include <pcl/filters/voxel_grid.h>
 #include <Eigen/Dense>
 #include <cmath>
 

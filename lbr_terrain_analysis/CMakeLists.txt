@@ -9,6 +9,7 @@ endif()
 find_package(ament_cmake_auto REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(PCL REQUIRED COMPONENTS filters features)
 
 ament_auto_find_build_dependencies()
 
