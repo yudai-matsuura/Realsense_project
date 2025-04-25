@@ -39,9 +39,6 @@ TerrainAnalysis::~TerrainAnalysis()
 }
 
 void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
-
-  if(received_once) return;
-  received_once = true;
   // Convert from ROS message to PCL
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*msg, *cloud);
@@ -84,7 +81,7 @@ void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::Sh
 
   RCLCPP_INFO(this->get_logger(), "Normal stddev: %.4f rad", stddev);
 
-  const int step = 100 ; // visualize every 1000 normal
+  const int step = 100 ; // visualize every 100 normal
   int id_counter = 0;
 
   for (size_t i = 0; i < filtered_cloud->points.size(); i += step) {
@@ -110,8 +107,8 @@ void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::Sh
     arrow_marker.scale.z = 0.02; // head length
     arrow_marker.color.a = 1.0;
     arrow_marker.color.r = 0.0;
-    arrow_marker.color.g = 0.0;
-    arrow_marker.color.b = 1.0;
+    arrow_marker.color.g = 1.0;
+    arrow_marker.color.b = 0.0;
     arrow_marker.lifetime = rclcpp::Duration::from_seconds(0);
 
     arrow_marker.points.push_back(p_start);
