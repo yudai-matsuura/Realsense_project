@@ -81,41 +81,41 @@ void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::Sh
 
   RCLCPP_INFO(this->get_logger(), "Normal stddev: %.4f rad", stddev);
 
-  visualization_msgs::msg::Marker marker;
-  marker.header.frame_id = msg->header.frame_id;
-  marker.header.stamp = this->now();
-  marker.ns = "normals";
-  marker.id = 0;
-  marker.type = visualization_msgs::msg::Marker::LINE_LIST;
-  marker.action = visualization_msgs::msg::Marker::ADD;
-  marker.scale.x = 0.002; // width of line
-  marker.color.a = 1.0;
-  marker.color.r = 0.0;
-  marker.color.g = 1.0;
-  marker.color.b = 0.0;
-
-  const int step = 1000; // visualize every 10th normal
+  const int step = 1000; // visualize every 1000 normal
+  int id_counter = 0;
 
   for (size_t i = 0; i < cloud->points.size(); i += step) {
-    if (!std::isfinite(normals->points[i].normal_x)) continue;
+    if(!std::isfinite(normals->points[i].normal_x)) continue;
 
     geometry_msgs::msg::Point p_start, p_end;
     p_start.x = cloud->points[i].x;
     p_start.y = cloud->points[i].y;
     p_start.z = cloud->points[i].z;
-
     p_end.x = p_start.x + 0.05 * normals->points[i].normal_x;
     p_end.y = p_start.y + 0.05 * normals->points[i].normal_y;
     p_end.z = p_start.z + 0.05 * normals->points[i].normal_z;
 
-    marker.points.push_back(p_start);
-    marker.points.push_back(p_end);
+    visualization_msgs::msg::Marker arrow_marker;
+    arrow_marker.header.frame_id = msg->header.frame_id;
+    arrow_marker.header.stamp = this->now();
+    arrow_marker.ns = "normals";
+    arrow_marker.id = id_counter++;
+    arrow_marker.type = visualization_msgs::msg::Marker::ARROW;
+    arrow_marker.action = visualization_msgs::msg::Marker::ADD;
+    arrow_marker.scale.x = 0.01; // width of arrow
+    arrow_marker.scale.y = 0.02; // head width
+    arrow_marker.scale.z = 0.02; // head length
+    arrow_marker.color.a = 1.0;
+    arrow_marker.color.r = 0.0;
+    arrow_marker.color.g = 0.0;
+    arrow_marker.color.b = 1.0;
+
+    arrow_marker.points.push_back(p_start);
+    arrow_marker.points.push_back(p_end);
+
+    marker_pub_->publish(arrow_marker);
   }
-
-  marker_pub_->publish(marker);
-
 }
-
 
 }  // namespace lbr_terrain_analysis
 
