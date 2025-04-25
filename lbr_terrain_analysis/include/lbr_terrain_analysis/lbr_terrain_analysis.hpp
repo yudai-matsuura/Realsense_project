@@ -53,8 +53,6 @@ private:
   void pointCloudCallback(
     const sensor_msgs::msg::PointCloud2::SharedPtr msg);
 
-    bool received_once = false;
-
   // Publisher
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
 
