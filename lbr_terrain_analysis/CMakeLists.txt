@@ -23,6 +23,7 @@ ament_auto_add_executable(lbr_terrain_analysis_node
 # install launch file
 install(DIRECTORY
   launch
+  config
   DESTINATION share/${PROJECT_NAME}/
 )
 

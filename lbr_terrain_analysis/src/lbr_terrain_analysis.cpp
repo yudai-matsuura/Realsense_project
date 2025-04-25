@@ -39,6 +39,9 @@ TerrainAnalysis::~TerrainAnalysis()
 }
 
 void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
+
+  if(received_once) return;
+  received_once = true;
   // Convert from ROS message to PCL
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*msg, *cloud);
@@ -55,7 +58,7 @@ void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::Sh
 
   // Normal estimation
   pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
-  ne.setInputCloud(cloud);
+  ne.setInputCloud(filtered_cloud);
   pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>());
   ne.setSearchMethod(tree);
   ne.setRadiusSearch(0.05);
@@ -81,16 +84,16 @@ void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::Sh
 
   RCLCPP_INFO(this->get_logger(), "Normal stddev: %.4f rad", stddev);
 
-  const int step = 1000; // visualize every 1000 normal
+  const int step = 100 ; // visualize every 1000 normal
   int id_counter = 0;
 
-  for (size_t i = 0; i < cloud->points.size(); i += step) {
+  for (size_t i = 0; i < filtered_cloud->points.size(); i += step) {
     if(!std::isfinite(normals->points[i].normal_x)) continue;
 
     geometry_msgs::msg::Point p_start, p_end;
-    p_start.x = cloud->points[i].x;
-    p_start.y = cloud->points[i].y;
-    p_start.z = cloud->points[i].z;
+    p_start.x = filtered_cloud->points[i].x;
+    p_start.y = filtered_cloud->points[i].y;
+    p_start.z = filtered_cloud->points[i].z;
     p_end.x = p_start.x + 0.05 * normals->points[i].normal_x;
     p_end.y = p_start.y + 0.05 * normals->points[i].normal_y;
     p_end.z = p_start.z + 0.05 * normals->points[i].normal_z;
@@ -109,6 +112,7 @@ void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::Sh
     arrow_marker.color.r = 0.0;
     arrow_marker.color.g = 0.0;
     arrow_marker.color.b = 1.0;
+    arrow_marker.lifetime = rclcpp::Duration::from_seconds(0);
 
     arrow_marker.points.push_back(p_start);
     arrow_marker.points.push_back(p_end);
