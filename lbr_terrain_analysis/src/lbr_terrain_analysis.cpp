@@ -55,7 +55,7 @@ void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::Sh
 
   // Estimate terrain roughness
   double angle_sum = 0.0;
-  double angle_sum_sq =0.0;
+  double angle_sum_sq = 0.0;
   int normal_count = 0;
   for (const auto& n : normals->points) {
       if(!std::isfinite(n.normal_x)) continue;
@@ -105,7 +105,7 @@ void TerrainAnalysis::publishNormals(
   const pcl::PointCloud<pcl::Normal>::Ptr & normals,
   const std::string & frame_id)
 {
-  const int step = 100; // visualize every 100 normal
+  const int step = 1; // visualize every 100 normal
   int id_counter = 0;
   float scale = 0.05; // length of arrow
 
@@ -127,10 +127,10 @@ void TerrainAnalysis::publishNormals(
     arrow_marker.id = id_counter++;
     arrow_marker.type = visualization_msgs::msg::Marker::ARROW;
     arrow_marker.action = visualization_msgs::msg::Marker::ADD;
-    arrow_marker.scale.x = 0.01;
-    arrow_marker.scale.y = 0.02;
+    arrow_marker.scale.x = 0.005;
+    arrow_marker.scale.y = 0.01;
     arrow_marker.scale.z = 0.02;
-    arrow_marker.color.a = 1.0;
+    arrow_marker.color.a = 0.7;
     arrow_marker.color.r = 0.0;
     arrow_marker.color.g = 1.0;
     arrow_marker.color.b = 0.0;
