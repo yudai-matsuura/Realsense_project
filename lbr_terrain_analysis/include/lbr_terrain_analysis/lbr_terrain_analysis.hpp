@@ -53,6 +53,30 @@ private:
   void pointCloudCallback(
     const sensor_msgs::msg::PointCloud2::SharedPtr msg);
 
+
+  /**
+   * @brief This function filters the point cloud using a voxel grid filter.
+   *
+   * @param cloud
+   */
+  pcl::PointCloud<pcl::PointXYZ>::Ptr downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud);
+
+    /**
+   * @brief This function filters the normals of point cloud.
+   *
+   * @param cloud
+   */
+  pcl::PointCloud<pcl::Normal>::Ptr estimateNormals(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud);
+
+    /**
+   * @brief This function visualize the arrows of normals.
+   *
+   * @param cloud
+   * @param normals
+   * @param frame_id
+   */
+  void publishNormals(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud, const pcl::PointCloud<pcl::Normal>::Ptr & normals, const std::string & frame_id);
+
   // Publisher
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
 
