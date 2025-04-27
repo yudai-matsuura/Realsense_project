@@ -38,31 +38,22 @@ TerrainAnalysis::~TerrainAnalysis()
   std::cout << "TerrainAnalysis class is destructed." << std::endl;
 }
 
+
+
 void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
   // Convert from ROS message to PCL
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*msg, *cloud);
   if(cloud->empty()) return;
 
-  // Downsample the point cloud
-  pcl::VoxelGrid<pcl::PointXYZ> sor;
-  sor.setInputCloud(cloud);
-  sor.setLeafSize(0.02f, 0.02f, 0.02f); // 2cm voxel
-  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  sor.filter(*filtered_cloud);
-
+  // Filter point cloud
+  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud = downsamplePointCloud(cloud);
   if(filtered_cloud->empty()) return;
 
-  // Normal estimation
-  pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
-  ne.setInputCloud(filtered_cloud);
-  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>());
-  ne.setSearchMethod(tree);
-  ne.setRadiusSearch(0.05);
-  pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
-  ne.compute(*normals);
+  //Estimate normals
+  pcl::PointCloud<pcl::Normal>::Ptr normals = estimateNormals(filtered_cloud);
 
-  // Estimate Terrain Analysis
+  // Estimate terrain roughness
   double angle_sum = 0.0;
   double angle_sum_sq =0.0;
   int normal_count = 0;
@@ -81,30 +72,63 @@ void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::Sh
 
   RCLCPP_INFO(this->get_logger(), "Normal stddev: %.4f rad", stddev);
 
-  const int step = 100 ; // visualize every 100 normal
-  int id_counter = 0;
+  // Publish to normal arrows to Rviz
+  publishNormals(filtered_cloud, normals, msg->header.frame_id);
 
-  for (size_t i = 0; i < filtered_cloud->points.size(); i += step) {
+}
+
+pcl::PointCloud<pcl::PointXYZ>::Ptr TerrainAnalysis::downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
+{
+  pcl::VoxelGrid<pcl::PointXYZ> sor;
+  sor.setInputCloud(cloud);
+  sor.setLeafSize(0.02f, 0.02f, 0.02f); // 2cm voxel
+  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  sor.filter(*filtered_cloud);
+  return filtered_cloud;
+
+}
+
+pcl::PointCloud<pcl::Normal>::Ptr TerrainAnalysis::estimateNormals(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
+{
+  pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
+  ne.setInputCloud(cloud);
+  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>());
+  ne.setSearchMethod(tree);
+  ne.setRadiusSearch(0.05);
+  pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
+  ne.compute(*normals);
+  return normals;
+}
+
+void TerrainAnalysis::publishNormals(
+  const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
+  const pcl::PointCloud<pcl::Normal>::Ptr & normals,
+  const std::string & frame_id)
+{
+  const int step = 100; // visualize every 100 normal
+  int id_counter = 0;
+  int scale = 0.05; // length of arrow
+
+  for(size_t i = 0; i < cloud->points.size(); i += step) {
     if(!std::isfinite(normals->points[i].normal_x)) continue;
 
     geometry_msgs::msg::Point p_start, p_end;
-    p_start.x = filtered_cloud->points[i].x;
-    p_start.y = filtered_cloud->points[i].y;
-    p_start.z = filtered_cloud->points[i].z;
-    p_end.x = p_start.x + 0.05 * normals->points[i].normal_x;
-    p_end.y = p_start.y + 0.05 * normals->points[i].normal_y;
-    p_end.z = p_start.z + 0.05 * normals->points[i].normal_z;
+    p_start.x = cloud->points[i].x;
+    p_start.y = cloud->points[i].y;
+    p_start.z = cloud->points[i].z;
+    p_end.x = p_start.x + scale * normals->points[i].normal_x;
+    p_end.y = p_start.y + scale * normals->points[i].normal_y;
+    p_end.z = p_start.z + scale * normals->points[i].normal_z;
 
     visualization_msgs::msg::Marker arrow_marker;
-    arrow_marker.header.frame_id = msg->header.frame_id;
+    arrow_marker.header.frame_id = frame_id;
     arrow_marker.header.stamp = this->now();
     arrow_marker.ns = "normals";
-    arrow_marker.id = id_counter++;
     arrow_marker.type = visualization_msgs::msg::Marker::ARROW;
     arrow_marker.action = visualization_msgs::msg::Marker::ADD;
-    arrow_marker.scale.x = 0.01; // width of arrow
-    arrow_marker.scale.y = 0.02; // head width
-    arrow_marker.scale.z = 0.02; // head length
+    arrow_marker.scale.x = 0.01;
+    arrow_marker.scale.y = 0.02;
+    arrow_marker.scale.z = 0.02;
     arrow_marker.color.a = 1.0;
     arrow_marker.color.r = 0.0;
     arrow_marker.color.g = 1.0;
@@ -116,6 +140,7 @@ void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::Sh
 
     marker_pub_->publish(arrow_marker);
   }
+
 }
 
 }  // namespace lbr_terrain_analysis
