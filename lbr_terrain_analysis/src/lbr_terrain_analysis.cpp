@@ -107,7 +107,7 @@ void TerrainAnalysis::publishNormals(
 {
   const int step = 100; // visualize every 100 normal
   int id_counter = 0;
-  int scale = 0.05; // length of arrow
+  float scale = 0.05; // length of arrow
 
   for(size_t i = 0; i < cloud->points.size(); i += step) {
     if(!std::isfinite(normals->points[i].normal_x)) continue;
@@ -124,6 +124,7 @@ void TerrainAnalysis::publishNormals(
     arrow_marker.header.frame_id = frame_id;
     arrow_marker.header.stamp = this->now();
     arrow_marker.ns = "normals";
+    arrow_marker.id = id_counter++;
     arrow_marker.type = visualization_msgs::msg::Marker::ARROW;
     arrow_marker.action = visualization_msgs::msg::Marker::ADD;
     arrow_marker.scale.x = 0.01;
