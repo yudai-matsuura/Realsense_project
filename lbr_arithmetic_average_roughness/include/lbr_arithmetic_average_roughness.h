@@ -1,0 +1,43 @@
+// Copyright (c) 2024 Tohoku Univ. Space Robotics Lab.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#ifndef LBR_ARITHMETIC_AVERAGE_ROUGHNESS__LBR_ARITHMETIC_AVERAGE_ROUGHNESS_HPP_
+#define LBR_ARITHMETIC_AVERAGE_ROUGHNESS__LBR_ARITHMETIC_AVERAGE_ROUGHNESS_HPP_
+
+#include <chrono>
+#include <cstdio>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <rclcpp/rclcpp.hpp>
+
+#include "lbr_arithmetic_average_roughness/visibility_control.h"
+
+namespace lbr_arithmetic_average_roughness
+{
+
+class ArithmeticAverageRoughness : public rclcpp::Node
+{
+public:
+  lbr_arithmetic_average_roughness_PUBLIC
+  explicit ArithmeticAverageRoughness(const rclcpp::NodeOptions & options);
+
+  virtual ~ArithmeticAverageRoughness();
+};
+
+}  // namespace lbr_arithmetic_average_roughness
+
+#endif  // LBR_ARITHMETIC_AVERAGE_ROUGHNESS__LBR_ARITHMETIC_AVERAGE_ROUGHNESS_HPP_
