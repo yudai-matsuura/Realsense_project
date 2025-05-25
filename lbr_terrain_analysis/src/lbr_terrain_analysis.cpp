@@ -105,7 +105,7 @@ void TerrainAnalysis::publishNormals(
   const pcl::PointCloud<pcl::Normal>::Ptr & normals,
   const std::string & frame_id)
 {
-  const int step = 1; // visualize every 100 normal
+  const int step = 1; // visualize every 1 normal
   int id_counter = 0;
   float scale = 0.05; // length of arrow
 
