@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 
+#include <sensor_msgs/msg/point_cloud2.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include "lbr_arithmetic_average_roughness/visibility_control.h"
@@ -36,6 +37,14 @@ public:
   explicit ArithmeticAverageRoughness(const rclcpp::NodeOptions & options);
 
   virtual ~ArithmeticAverageRoughness();
+
+private:
+  void pointCloudCallback(
+    const sensor_msgs::msg::PointCloud2::SharedPtr msg);
+
+
+// Subscriber
+rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_sub_;
 };
 
 }  // namespace lbr_arithmetic_average_roughness

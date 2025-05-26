@@ -24,11 +24,19 @@ ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions
 : rclcpp::Node("lbr_arithmetic_average_roughness", options)
 {
   std::cout << "ArithmeticAverageRoughness class is established." << std::endl;
+  // Subscriber
+  point_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+    "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
+    std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
 }
 
 ArithmeticAverageRoughness::~ArithmeticAverageRoughness()
 {
   std::cout << "ArithmeticAverageRoughness class is destructed." << std::endl;
+}
+
+
+void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg){
 }
 
 }  // namespace lbr_arithmetic_average_roughness
