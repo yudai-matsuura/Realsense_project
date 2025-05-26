@@ -32,7 +32,7 @@ namespace lbr_arithmetic_average_roughness
 class ArithmeticAverageRoughness : public rclcpp::Node
 {
 public:
-  lbr_arithmetic_average_roughness_PUBLIC
+  LBR_ARITHMETIC_AVERAGE_ROUGHNESS_PUBLIC
   explicit ArithmeticAverageRoughness(const rclcpp::NodeOptions & options);
 
   virtual ~ArithmeticAverageRoughness();

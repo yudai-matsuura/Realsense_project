@@ -23,7 +23,6 @@ ament_auto_add_executable(lbr_arithmetic_average_roughness_node
 # install launch file
 install(DIRECTORY
   launch
-  config
   DESTINATION share/${PROJECT_NAME}/
 )
 
