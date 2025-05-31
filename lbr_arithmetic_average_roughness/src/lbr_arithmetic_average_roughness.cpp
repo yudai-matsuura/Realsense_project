@@ -49,6 +49,11 @@ pcl::PointCloud<pcl::PointCloudXYZ>::Ptr ArithmeticAverageRoughness::downsampleP
   return filtered_cloud;
 }
 
+// Add a function to estimate the regression plane 
+
+
+// Add a function to caluculate and average the height from the plane
+
 }  // namespace lbr_arithmetic_average_roughness
 
 RCLCPP_COMPONENTS_REGISTER_NODE(lbr_arithmetic_average_roughness::ArithmeticAverageRoughness)
