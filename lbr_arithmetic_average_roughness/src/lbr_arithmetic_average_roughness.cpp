@@ -39,6 +39,16 @@ ArithmeticAverageRoughness::~ArithmeticAverageRoughness()
 void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg){
 }
 
+pcl::PointCloud<pcl::PointCloudXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointCloudXYZ>::Ptr & cloud)
+{
+  pcl::VoxelGrid<pcl::PointXYZ> sor;
+  sor.setInputCloud(cloud);
+  sor.setLeafSize(0.02f, 0.02f, 0.02f); // 2cm voxel
+  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  sor.filter(*filtered_cloud);
+  return filtered_cloud;
+}
+
 }  // namespace lbr_arithmetic_average_roughness
 
 RCLCPP_COMPONENTS_REGISTER_NODE(lbr_arithmetic_average_roughness::ArithmeticAverageRoughness)

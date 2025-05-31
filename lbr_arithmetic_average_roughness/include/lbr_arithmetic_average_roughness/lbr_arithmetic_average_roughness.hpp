@@ -42,6 +42,12 @@ private:
   void pointCloudCallback(
     const sensor_msgs::msg::PointCloud2::SharedPtr msg);
 
+  /**
+   * @brief This function filters the point cloud using a voxel grid filter.
+   *
+   * @param cloud
+   */
+  pcl::PointCloud<pcl::PointCloudXYZ>::Ptr downsamplePointCloud(const pcl::PointCloud<pcl::PointCloudXYZ>::Ptr & cloud);
 
 // Subscriber
 rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_sub_;
