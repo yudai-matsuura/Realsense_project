@@ -37,9 +37,12 @@ ArithmeticAverageRoughness::~ArithmeticAverageRoughness()
 
 
 void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg){
+  // まず点群にフィルターをかける
+  // 平面推定
+  // 可視化
 }
 
-pcl::PointCloud<pcl::PointCloudXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointCloudXYZ>::Ptr & cloud)
+pcl::PointCloud<pcl::PointCloudXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
 {
   pcl::VoxelGrid<pcl::PointXYZ> sor;
   sor.setInputCloud(cloud);
@@ -50,6 +53,33 @@ pcl::PointCloud<pcl::PointCloudXYZ>::Ptr ArithmeticAverageRoughness::downsampleP
 }
 
 // Add a function to estimate the regression plane 
+
+void ArithmeticAverageRoughness::estimateRegressionPlane(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud, Eigen::Vector4f& plane_centroid, Eigen::Vector3f& plane_normal)
+{
+  // Calculate centroid of the point cloud
+  pcl::compute3Dcentroid(*cloud, plane_centroid);
+
+  // Calculate deviation matrix
+  Eigen::MatrixXf centered(3, cloud->size());
+  for (size_t i = 0; i < cloud->size(); i++){
+    centered(0, i) = cloud->points[i].x - plane=centroid[0];
+    centered(1, i) = cloud->points[i].y - plane=centroid[1];
+    centered(2, i) = cloud->points[i].z - plane=centroid[2];
+  }
+
+  // Calculate the convariance matrix
+  Eigen::Matrix3f convariance = centered * centered.transpose();
+
+  // Calculates the eigenvalues of the convariance matrix
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> solver(convariance);
+  if (solver.info() != Eigen::Success) {
+    throw std::runtime_error("Eigen decomposition failed");
+  }
+
+  // The eigenvector corresponding to the smallest eigenvalue (normal of the plane)
+  plane_normal = solver.eigenvectors().col(0);
+
+}
 
 
 // Add a function to caluculate and average the height from the plane

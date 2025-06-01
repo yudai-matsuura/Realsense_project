@@ -21,6 +21,10 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <protocols/common/centroid.h>
+#include <Eigen/Dense>
 
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -47,7 +51,14 @@ private:
    *
    * @param cloud
    */
-  pcl::PointCloud<pcl::PointCloudXYZ>::Ptr downsamplePointCloud(const pcl::PointCloud<pcl::PointCloudXYZ>::Ptr & cloud);
+  pcl::PointCloud<pcl::PointCloudXYZ>::Ptr downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud);
+
+  /**
+   * @brief This function estimate the regression plane
+   *
+   * @param cloud, plane_centroid, plane_normal
+   */
+  pcl::PointCloud<pcl::PointCloudXYZ>::Ptr estimateRegressionPlane(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud, Eigen::Vector4f& plane_centroid, Eigen::Vector3f& plane_normal);
 
 // Subscriber
 rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_sub_;
