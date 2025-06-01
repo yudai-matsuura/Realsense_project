@@ -24,6 +24,8 @@ ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions
 : rclcpp::Node("lbr_arithmetic_average_roughness", options)
 {
   std::cout << "ArithmeticAverageRoughness class is established." << std::endl;
+  // Publisher
+  maker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("estimated_plane_marker", 10);
   // Subscriber
   point_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
@@ -37,7 +39,7 @@ ArithmeticAverageRoughness::~ArithmeticAverageRoughness()
 
 
 void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg){
-  // まず点群にフィルターをかける
+  // 点群にフィルターをかける
   // 平面推定
   // 可視化
 }
@@ -78,6 +80,49 @@ void ArithmeticAverageRoughness::estimateRegressionPlane(const pcl::PointCloud<p
 
   // The eigenvector corresponding to the smallest eigenvalue (normal of the plane)
   plane_normal = solver.eigenvectors().col(0);
+}
+
+void publishPlaneMarker(const Eigen::Vector4f& centroid, const Eigen::Vector3f& normal, const std::string & frame_id)
+{
+  visualization_msgs::Marker plane_marker;
+  plane_marker.header.frame_id = frame_id;
+  plane_marker.header.stamp = this->now();
+  plane_marker.ns = "estimated_plane";
+  plane_marker.type = visualization_msgs::Marker::TRIANGLE_LIST;
+  plane_marker.action = visualization_msgs::Marker::ADD;
+  plane_marker.scale.x = 1.0;
+  plane_marker.scale.y = 1.0;
+  plane_marker.scale.z = 1.0;
+  plane_marker.color.r = 0.0f;
+  plane_marker.color.g = 1.0f;
+  plane_marker.color.b = 0.0f;
+  plane_marker.color.a = 0.5f;
+
+  // Create a point on a plane by generating two vectors perpendicular to the normal
+  Eigen::Vector3f basis1, basis2;
+  basis1 = normal.unitOrthogonal();
+  basis2 = normal.cross(basis1);
+
+  float plane_size = 0.3;
+  Eigen::Vector3f center(centroid.head<3>());
+
+  std::vector<Eigen::Vector3f> corners;
+  corners.push_back(center + plane_size * ( basis1 + basis2));
+  corners.push_back(center + plane_size * ( -basis1 + basis2));
+  corners.push_back(center + plane_size * ( basis1 - basis2));
+  corners.push_back(center + plane_size * ( basis1 - basis2));
+
+  // make square using two triangle
+  geometry_msgs::Point p0, p1, p2, p3;
+  p0.x = corners[0].x(); p0.y = corners[0].y(); p0.z = corners[0].z();
+  p1.x = corners[1].x(); p1.y = corners[1].y(); p1.z = corners[1].z();
+  p2.x = corners[2].x(); p2.y = corners[2].y(); p2.z = corners[2].z();
+  p3.x = corners[3].x(); p3.y = corners[3].y(); p3.z = corners[3].z();
+
+  plane_marker.points.push_back(p0); plane_marker.points.push_back(p1); plane_marker.points.push_back(p2);
+  plane_marker.points.push_back(p2); plane_marker.points.push_back(p3); plane_marker.points.push_back(p0);
+
+  maker_pub_.publish(plane_marker);
 
 }
 

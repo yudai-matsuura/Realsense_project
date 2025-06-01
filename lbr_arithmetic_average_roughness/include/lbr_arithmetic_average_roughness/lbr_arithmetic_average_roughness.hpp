@@ -25,6 +25,8 @@
 #include <pcl/point_types.h>
 #include <protocols/common/centroid.h>
 #include <Eigen/Dense>
+#include <visualization_msgs/Marker.h>
+#include <geometry_msgs/Point.h>
 
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -60,6 +62,15 @@ private:
    */
   pcl::PointCloud<pcl::PointCloudXYZ>::Ptr estimateRegressionPlane(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud, Eigen::Vector4f& plane_centroid, Eigen::Vector3f& plane_normal);
 
+    /**
+   * @brief This function publish estimated plane marker
+   *
+   * @param centroid, normal, frame_id
+   */
+  void publishPlaneMarker(const Eigen::Vector4f& centroid, const Eigen::Vector3f& normal, const std::string & frame_id);
+
+// Publisher
+rclcpp::Publosher<visualization_msgs::msg::Marker>::SharedPtr maker_pub_;
 // Subscriber
 rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_sub_;
 };
