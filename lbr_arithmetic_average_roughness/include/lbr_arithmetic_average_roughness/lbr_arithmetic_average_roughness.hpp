@@ -62,8 +62,8 @@ private:
    */
   pcl::PointCloud<pcl::PointCloudXYZ>::Ptr estimateRegressionPlane(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud, Eigen::Vector4f& plane_centroid, Eigen::Vector3f& plane_normal);
 
-    /**
-   * @brief This function publish estimated plane marker
+  /**
+   * @brief This function visualize estimated plane
    *
    * @param centroid, normal, frame_id
    */
