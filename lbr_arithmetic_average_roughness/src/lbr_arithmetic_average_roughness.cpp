@@ -39,9 +39,19 @@ ArithmeticAverageRoughness::~ArithmeticAverageRoughness()
 
 
 void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg){
-  // 点群にフィルターをかける
-  // 平面推定
-  // 可視化
+  // Convert from ROS message to PCL
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::fromROSMsg(*msg, *cloud);
+  if(cloud->empty()) return;
+  // Downsample point cloud
+  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud = downsamplePointCloud(cloud);
+  if(filtered_cloud->empty()) return;
+  // Estimate plane
+  Eigen::Vector4f centroid;
+  Eigen::Vector3f normal;
+  estimateRegressionPlane(filtered_cloud, centroid, normal);
+  // Visusalize estimated plane
+  publishPlaneMarker(centroid, normal, msg->header.frame_id);
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
