@@ -25,7 +25,7 @@ ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions
 {
   std::cout << "ArithmeticAverageRoughness class is established." << std::endl;
   // Publisher
-  maker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("estimated_plane_marker", 10);
+  marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("estimated_plane_marker", 10);
   // Subscriber
   point_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
@@ -44,7 +44,7 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   // 可視化
 }
 
-pcl::PointCloud<pcl::PointCloudXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
+pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
 {
   pcl::VoxelGrid<pcl::PointXYZ> sor;
   sor.setInputCloud(cloud);
@@ -54,19 +54,19 @@ pcl::PointCloud<pcl::PointCloudXYZ>::Ptr ArithmeticAverageRoughness::downsampleP
   return filtered_cloud;
 }
 
-// Add a function to estimate the regression plane 
+// Add a function to estimate the regression plane
 
 void ArithmeticAverageRoughness::estimateRegressionPlane(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud, Eigen::Vector4f& plane_centroid, Eigen::Vector3f& plane_normal)
 {
   // Calculate centroid of the point cloud
-  pcl::compute3Dcentroid(*cloud, plane_centroid);
+  pcl::compute3DCentroid(*cloud, plane_centroid);
 
   // Calculate deviation matrix
   Eigen::MatrixXf centered(3, cloud->size());
   for (size_t i = 0; i < cloud->size(); i++){
-    centered(0, i) = cloud->points[i].x - plane=centroid[0];
-    centered(1, i) = cloud->points[i].y - plane=centroid[1];
-    centered(2, i) = cloud->points[i].z - plane=centroid[2];
+    centered(0, i) = cloud->points[i].x - plane_centroid[0];
+    centered(1, i) = cloud->points[i].y - plane_centroid[1];
+    centered(2, i) = cloud->points[i].z - plane_centroid[2];
   }
 
   // Calculate the convariance matrix
@@ -82,14 +82,14 @@ void ArithmeticAverageRoughness::estimateRegressionPlane(const pcl::PointCloud<p
   plane_normal = solver.eigenvectors().col(0);
 }
 
-void publishPlaneMarker(const Eigen::Vector4f& centroid, const Eigen::Vector3f& normal, const std::string & frame_id)
+void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f& centroid, const Eigen::Vector3f& normal, const std::string & frame_id)
 {
-  visualization_msgs::Marker plane_marker;
+  visualization_msgs::msg::Marker plane_marker;
   plane_marker.header.frame_id = frame_id;
   plane_marker.header.stamp = this->now();
   plane_marker.ns = "estimated_plane";
-  plane_marker.type = visualization_msgs::Marker::TRIANGLE_LIST;
-  plane_marker.action = visualization_msgs::Marker::ADD;
+  plane_marker.type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
+  plane_marker.action = visualization_msgs::msg::Marker::ADD;
   plane_marker.scale.x = 1.0;
   plane_marker.scale.y = 1.0;
   plane_marker.scale.z = 1.0;
@@ -109,11 +109,11 @@ void publishPlaneMarker(const Eigen::Vector4f& centroid, const Eigen::Vector3f& 
   std::vector<Eigen::Vector3f> corners;
   corners.push_back(center + plane_size * ( basis1 + basis2));
   corners.push_back(center + plane_size * ( -basis1 + basis2));
-  corners.push_back(center + plane_size * ( basis1 - basis2));
+  corners.push_back(center + plane_size * ( -basis1 - basis2));
   corners.push_back(center + plane_size * ( basis1 - basis2));
 
   // make square using two triangle
-  geometry_msgs::Point p0, p1, p2, p3;
+  geometry_msgs::msg::Point p0, p1, p2, p3;
   p0.x = corners[0].x(); p0.y = corners[0].y(); p0.z = corners[0].z();
   p1.x = corners[1].x(); p1.y = corners[1].y(); p1.z = corners[1].z();
   p2.x = corners[2].x(); p2.y = corners[2].y(); p2.z = corners[2].z();
@@ -122,7 +122,7 @@ void publishPlaneMarker(const Eigen::Vector4f& centroid, const Eigen::Vector3f& 
   plane_marker.points.push_back(p0); plane_marker.points.push_back(p1); plane_marker.points.push_back(p2);
   plane_marker.points.push_back(p2); plane_marker.points.push_back(p3); plane_marker.points.push_back(p0);
 
-  maker_pub_.publish(plane_marker);
+  marker_pub_->publish(plane_marker);
 
 }
 

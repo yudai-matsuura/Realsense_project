@@ -23,10 +23,11 @@
 #include <vector>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <protocols/common/centroid.h>
+#include <pcl/common/centroid.h>
+#include <pcl/filters/voxel_grid.h>
 #include <Eigen/Dense>
-#include <visualization_msgs/Marker.h>
-#include <geometry_msgs/Point.h>
+#include <visualization_msgs/msg/marker.hpp>
+#include <geometry_msgs/msg/point.hpp>
 
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -53,14 +54,14 @@ private:
    *
    * @param cloud
    */
-  pcl::PointCloud<pcl::PointCloudXYZ>::Ptr downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud);
 
   /**
    * @brief This function estimate the regression plane
    *
    * @param cloud, plane_centroid, plane_normal
    */
-  pcl::PointCloud<pcl::PointCloudXYZ>::Ptr estimateRegressionPlane(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud, Eigen::Vector4f& plane_centroid, Eigen::Vector3f& plane_normal);
+  void estimateRegressionPlane(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud, Eigen::Vector4f& plane_centroid, Eigen::Vector3f& plane_normal);
 
   /**
    * @brief This function visualize estimated plane
@@ -70,7 +71,7 @@ private:
   void publishPlaneMarker(const Eigen::Vector4f& centroid, const Eigen::Vector3f& normal, const std::string & frame_id);
 
 // Publisher
-rclcpp::Publosher<visualization_msgs::msg::Marker>::SharedPtr maker_pub_;
+rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
 // Subscriber
 rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_sub_;
 };
