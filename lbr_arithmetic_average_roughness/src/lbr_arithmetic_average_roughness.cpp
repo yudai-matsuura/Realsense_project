@@ -56,6 +56,7 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
 {
+  // TODO: Add NaN value filtering
   pcl::VoxelGrid<pcl::PointXYZ> sor;
   sor.setInputCloud(cloud);
   sor.setLeafSize(0.02f, 0.02f, 0.02f); // 2cm voxel
@@ -168,8 +169,20 @@ void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f& centr
   marker_pub_->publish(centroid_marker);
 }
 
-
-// Add a function to caluculate and average the height from the plane
+float ArithmeticAverageRoughness::calculateAverageHeightFromPlane(
+  const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
+  const Eigen::Vector4f& plane_centroid,
+  const Eigen::Vector3f& plane_normal)
+{
+  float total_distance = 0.0f;
+  for (const auto & point : cloud->points) {
+    Eigen::Vector3f vec = point.getVector3fMap() - plane_centroid.head<3>(); // vec = pi - p0
+    float distance = std::abs(plane_normal.dot(vec));
+    total_distance += distance;
+  }
+  if (cloud->empty()) return 0.0f;
+  return total_distance / static_cast<float>(cloud->size()); // Average
+}
 
 }  // namespace lbr_arithmetic_average_roughness
 

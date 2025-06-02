@@ -71,6 +71,14 @@ private:
    */
   void publishPlaneMarker(const Eigen::Vector4f& centroid, const Eigen::Vector3f& normal, const std::string & frame_id);
 
+  /**
+   * @brief This function calculate the avarage height from the estimated plane.
+   *
+   * @param cloud, centroid, normal
+   */
+  float calculateAverageHeightFromPlane(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
+                                        const Eigen::Vector4f& plane_centroid,
+                                        const Eigen::Vector3f& plane_normal);
 // Publisher
 rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
 // Subscriber
