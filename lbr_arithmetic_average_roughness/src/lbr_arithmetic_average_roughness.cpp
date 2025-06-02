@@ -64,8 +64,6 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointC
   return filtered_cloud;
 }
 
-// Add a function to estimate the regression plane
-
 void ArithmeticAverageRoughness::estimateRegressionPlane(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud, Eigen::Vector4f& plane_centroid, Eigen::Vector3f& plane_normal)
 {
   // Calculate centroid of the point cloud
@@ -100,6 +98,7 @@ void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f& centr
   plane_marker.ns = "estimated_plane";
   plane_marker.type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
   plane_marker.action = visualization_msgs::msg::Marker::ADD;
+  plane_marker.lifetime = rclcpp::Duration::from_seconds(0);
   plane_marker.scale.x = 1.0;
   plane_marker.scale.y = 1.0;
   plane_marker.scale.z = 1.0;
@@ -131,6 +130,9 @@ void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f& centr
 
   plane_marker.points.push_back(p0); plane_marker.points.push_back(p1); plane_marker.points.push_back(p2);
   plane_marker.points.push_back(p2); plane_marker.points.push_back(p3); plane_marker.points.push_back(p0);
+
+  plane_marker.points.push_back(p2); plane_marker.points.push_back(p1); plane_marker.points.push_back(p0);
+  plane_marker.points.push_back(p0); plane_marker.points.push_back(p3); plane_marker.points.push_back(p2);
 
   marker_pub_->publish(plane_marker);
 

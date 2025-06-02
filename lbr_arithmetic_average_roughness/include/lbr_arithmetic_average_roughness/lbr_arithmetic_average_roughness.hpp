@@ -24,6 +24,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/common/centroid.h>
+#include <pcl_conversions/pcl_conversions.h>
 #include <pcl/filters/voxel_grid.h>
 #include <Eigen/Dense>
 #include <visualization_msgs/msg/marker.hpp>
