@@ -92,6 +92,9 @@ void ArithmeticAverageRoughness::estimateRegressionPlane(const pcl::PointCloud<p
 
 void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f& centroid, const Eigen::Vector3f& normal, const std::string & frame_id)
 {
+  // -------
+  // Visualize estimated plane
+  // -------
   visualization_msgs::msg::Marker plane_marker;
   plane_marker.header.frame_id = frame_id;
   plane_marker.header.stamp = this->now();
@@ -136,6 +139,33 @@ void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f& centr
 
   marker_pub_->publish(plane_marker);
 
+  // -------
+  // Visualize centroid point
+  // -------
+
+  visualization_msgs::msg::Marker centroid_marker;
+  centroid_marker.header.frame_id = frame_id;
+  centroid_marker.header.stamp = this->now();
+  centroid_marker.ns = "centroid_point";
+  centroid_marker.type = visualization_msgs::msg::Marker::SPHERE;
+  centroid_marker.action = visualization_msgs::msg::Marker::ADD;
+  centroid_marker.lifetime = rclcpp::Duration::from_seconds(0);
+  centroid_marker.scale.x = 0.02;
+  centroid_marker.scale.y = 0.02;
+  centroid_marker.scale.z = 0.02;
+  centroid_marker.color.r = 1.0f;
+  centroid_marker.color.g = 0.0f;
+  centroid_marker.color.b = 0.0f;
+  centroid_marker.color.a = 1.0f;
+  centroid_marker.pose.position.x = center.x();
+  centroid_marker.pose.position.y = center.y();
+  centroid_marker.pose.position.z = center.z();
+  centroid_marker.pose.orientation.w = 1.0;  // No rotation
+  centroid_marker.pose.orientation.x = 0.0;
+  centroid_marker.pose.orientation.y = 0.0;
+  centroid_marker.pose.orientation.z = 0.0;
+
+  marker_pub_->publish(centroid_marker);
 }
 
 
