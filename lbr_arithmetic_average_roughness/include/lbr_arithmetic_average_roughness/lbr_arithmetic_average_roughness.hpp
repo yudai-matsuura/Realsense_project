@@ -76,9 +76,20 @@ private:
    *
    * @param cloud, centroid, normal
    */
-  float calculateAverageHeightFromPlane(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
+  std::vector<float> computePointToPlaneDistance(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
                                         const Eigen::Vector4f& plane_centroid,
                                         const Eigen::Vector3f& plane_normal);
+
+  /**
+   * @brief This function publish the HeatMap calculated from the average height.
+   *
+   * @param cloud, frame_id
+   */
+  void publishRoughnessHeatMap(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
+    const Eigen::Vector4f & centroid,
+    const Eigen::Vector3f & normal,
+    const std::string & frame_id);
+
 // Publisher
 rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
 // Subscriber

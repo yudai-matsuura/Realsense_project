@@ -46,12 +46,13 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   // Downsample point cloud
   pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud = downsamplePointCloud(cloud);
   if(filtered_cloud->empty()) return;
-  // Estimate plane
+  // Estimate plane & create heatmap
   Eigen::Vector4f centroid;
   Eigen::Vector3f normal;
   estimateRegressionPlane(filtered_cloud, centroid, normal);
-  // Visusalize estimated plane
+  // Visualize estimated plane
   publishPlaneMarker(centroid, normal, msg->header.frame_id);
+  publishRoughnessHeatMap(filtered_cloud, centroid, normal, msg->header.frame_id);
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
@@ -93,9 +94,9 @@ void ArithmeticAverageRoughness::estimateRegressionPlane(const pcl::PointCloud<p
 
 void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f& centroid, const Eigen::Vector3f& normal, const std::string & frame_id)
 {
-  // -------
+  // --------------------------
   // Visualize estimated plane
-  // -------
+  // --------------------------
   visualization_msgs::msg::Marker plane_marker;
   plane_marker.header.frame_id = frame_id;
   plane_marker.header.stamp = this->now();
@@ -140,9 +141,9 @@ void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f& centr
 
   marker_pub_->publish(plane_marker);
 
-  // -------
+  // --------------------------
   // Visualize centroid point
-  // -------
+  // --------------------------
 
   visualization_msgs::msg::Marker centroid_marker;
   centroid_marker.header.frame_id = frame_id;
@@ -169,19 +170,68 @@ void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f& centr
   marker_pub_->publish(centroid_marker);
 }
 
-float ArithmeticAverageRoughness::calculateAverageHeightFromPlane(
+std::vector<float> ArithmeticAverageRoughness::computePointToPlaneDistance(
   const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
   const Eigen::Vector4f& plane_centroid,
   const Eigen::Vector3f& plane_normal)
 {
-  float total_distance = 0.0f;
+  std::vector<float> distances;
+  distances.reserve(cloud->size());
   for (const auto & point : cloud->points) {
     Eigen::Vector3f vec = point.getVector3fMap() - plane_centroid.head<3>(); // vec = pi - p0
     float distance = std::abs(plane_normal.dot(vec));
-    total_distance += distance;
+    distances.push_back(distance);
   }
-  if (cloud->empty()) return 0.0f;
-  return total_distance / static_cast<float>(cloud->size()); // Average
+    return distances;
+}
+
+// TODO: Add function to create heatmap
+
+void ArithmeticAverageRoughness::publishRoughnessHeatMap(
+  const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
+  const Eigen::Vector4f & centroid,
+  const Eigen::Vector3f & normal,
+  const std::string & frame_id
+)
+{
+  visualization_msgs::msg::Marker heatmap_marker;
+  heatmap_marker.header.frame_id = frame_id;
+  heatmap_marker.header.stamp = this->now();
+  heatmap_marker.ns = "roughness_heatmap";
+  heatmap_marker.type = visualization_msgs::msg::Marker::POINTS;
+  heatmap_marker.action = visualization_msgs::msg::Marker::ADD;
+  heatmap_marker.scale.x = 0.01;
+  heatmap_marker.scale.y = 0.01;
+  heatmap_marker.color.a = 1.0f;
+  heatmap_marker.lifetime = rclcpp::Duration::from_seconds(0);
+
+  std::vector<float> distances = computePointToPlaneDistance(cloud, centroid, normal);
+
+  float max_distance = 0.0f;
+  for (const float & d : distances) {
+    if (d > max_distance) max_distance = d;
+  }
+
+  for (size_t i = 0; i < cloud->points.size(); ++i) {
+    const auto & point = cloud->points[i];
+    // Convert to ROS message
+    geometry_msgs::msg::Point ros_point;
+    ros_point.x = point.x;
+    ros_point.y = point.y;
+    ros_point.z = point.z;
+    heatmap_marker.points.push_back(ros_point);
+
+    std_msgs::msg::ColorRGBA color;
+    float norm = (max_distance > 0.0f) ? distances[i] / max_distance : 0.0f; // Normalization
+
+    // Create heatmap color
+    color.r = norm;
+    color.g = 1.0f - std::abs(norm - 0.5f) * 2.0f;
+    color.b = 1.0f - norm;
+    color.a = 1.0f;
+    heatmap_marker.colors.push_back(color);
+  }
+  marker_pub_->publish(heatmap_marker);
 }
 
 }  // namespace lbr_arithmetic_average_roughness
