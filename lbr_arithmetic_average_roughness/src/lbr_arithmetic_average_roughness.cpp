@@ -60,7 +60,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointC
   // TODO: Add NaN value filtering
   pcl::VoxelGrid<pcl::PointXYZ> sor;
   sor.setInputCloud(cloud);
-  sor.setLeafSize(0.02f, 0.02f, 0.02f); // 2cm voxel
+  sor.setLeafSize(0.01f, 0.01f, 0.01f); // 1cm voxel
   pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   sor.filter(*filtered_cloud);
   return filtered_cloud;
@@ -185,8 +185,6 @@ std::vector<float> ArithmeticAverageRoughness::computePointToPlaneDistance(
     return distances;
 }
 
-// TODO: Add function to create heatmap
-
 void ArithmeticAverageRoughness::publishRoughnessHeatMap(
   const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
   const Eigen::Vector4f & centroid,
@@ -200,10 +198,10 @@ void ArithmeticAverageRoughness::publishRoughnessHeatMap(
   heatmap_marker.ns = "roughness_heatmap";
   heatmap_marker.type = visualization_msgs::msg::Marker::SPHERE_LIST;
   heatmap_marker.action = visualization_msgs::msg::Marker::ADD;
-  heatmap_marker.scale.x = 0.01;
-  heatmap_marker.scale.y = 0.01;
-  heatmap_marker.scale.z = 0.01;
-  heatmap_marker.color.a = 1.0f;
+  heatmap_marker.scale.x = 0.005;
+  heatmap_marker.scale.y = 0.005;
+  heatmap_marker.scale.z = 0.005;
+  heatmap_marker.color.a = 0.6f;
   heatmap_marker.lifetime = rclcpp::Duration::from_seconds(0);
 
   std::vector<float> distances = computePointToPlaneDistance(cloud, centroid, normal);
@@ -226,9 +224,13 @@ void ArithmeticAverageRoughness::publishRoughnessHeatMap(
     float norm = (max_distance > 0.0f) ? distances[i] / max_distance : 0.0f; // Normalization
 
     // Create heatmap color
-    color.r = norm;
-    color.g = 1.0f - std::abs(norm - 0.5f) * 2.0f;
-    color.b = 1.0f - norm;
+    float r = std::min(1.0f, std::max(0.0f, 1.5f - std::abs(4.0f * norm - 3.0f)));
+    float g = std::min(1.0f, std::max(0.0f, 1.5f - std::abs(4.0f * norm - 2.0f)));
+    float b = std::min(1.0f, std::max(0.0f, 1.5f - std::abs(4.0f * norm - 1.0f)));
+
+    color.r = r;
+    color.g = g;
+    color.b = b;
     color.a = 1.0f;
     heatmap_marker.colors.push_back(color);
   }
