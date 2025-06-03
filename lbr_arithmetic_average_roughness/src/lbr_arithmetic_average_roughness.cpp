@@ -117,7 +117,7 @@ void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f& centr
   basis1 = normal.unitOrthogonal();
   basis2 = normal.cross(basis1);
 
-  float plane_size = 0.3;
+  float plane_size = 0.5;
   Eigen::Vector3f center(centroid.head<3>());
 
   std::vector<Eigen::Vector3f> corners;
@@ -198,10 +198,11 @@ void ArithmeticAverageRoughness::publishRoughnessHeatMap(
   heatmap_marker.header.frame_id = frame_id;
   heatmap_marker.header.stamp = this->now();
   heatmap_marker.ns = "roughness_heatmap";
-  heatmap_marker.type = visualization_msgs::msg::Marker::POINTS;
+  heatmap_marker.type = visualization_msgs::msg::Marker::SPHERE_LIST;
   heatmap_marker.action = visualization_msgs::msg::Marker::ADD;
   heatmap_marker.scale.x = 0.01;
   heatmap_marker.scale.y = 0.01;
+  heatmap_marker.scale.z = 0.01;
   heatmap_marker.color.a = 1.0f;
   heatmap_marker.lifetime = rclcpp::Duration::from_seconds(0);
 
