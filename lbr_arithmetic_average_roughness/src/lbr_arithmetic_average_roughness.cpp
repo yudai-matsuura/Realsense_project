@@ -52,7 +52,11 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   estimateRegressionPlane(filtered_cloud, centroid, normal);
   // Visualize estimated plane
   publishPlaneMarker(centroid, normal, msg->header.frame_id);
-  publishRoughnessHeatMap(filtered_cloud, centroid, normal, msg->header.frame_id);
+  std::vector<float> distances = computePointToPlaneDistance(filtered_cloud, centroid, normal);
+  float roughness_score = computeRoughnessScore(distances);
+  std::cout << "Roughness score:" << roughness_score << std::endl;
+  // Visualize HeatMap
+  publishRoughnessHeatMap(filtered_cloud, msg->header.frame_id, distances);
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
@@ -187,9 +191,8 @@ std::vector<float> ArithmeticAverageRoughness::computePointToPlaneDistance(
 
 void ArithmeticAverageRoughness::publishRoughnessHeatMap(
   const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
-  const Eigen::Vector4f & centroid,
-  const Eigen::Vector3f & normal,
-  const std::string & frame_id
+  const std::string & frame_id,
+  const std::vector<float> & distances
 )
 {
   visualization_msgs::msg::Marker heatmap_marker;
@@ -203,8 +206,6 @@ void ArithmeticAverageRoughness::publishRoughnessHeatMap(
   heatmap_marker.scale.z = 0.005;
   heatmap_marker.color.a = 0.6f;
   heatmap_marker.lifetime = rclcpp::Duration::from_seconds(0);
-
-  std::vector<float> distances = computePointToPlaneDistance(cloud, centroid, normal);
 
   float max_distance = 0.0f;
   for (const float & d : distances) {
@@ -235,6 +236,21 @@ void ArithmeticAverageRoughness::publishRoughnessHeatMap(
     heatmap_marker.colors.push_back(color);
   }
   marker_pub_->publish(heatmap_marker);
+}
+
+float ArithmeticAverageRoughness::computeRoughnessScore(const std::vector<float> & distance){
+  float sq_sum = 0.0f;
+  float maximum_roughness = 0.05f; // Maximum roughness threshold in meters
+  size_t filtered_pointcloud_number = distance.size();
+
+  for (float d : distance) {
+    sq_sum += d * d;
+  }
+
+  float variance = (sq_sum / filtered_pointcloud_number);
+  float roughness_score = std::sqrt(variance); // Standard deviation
+  float normalized_score = std::min(1.0f, roughness_score / maximum_roughness);
+  return normalized_score;
 }
 
 }  // namespace lbr_arithmetic_average_roughness

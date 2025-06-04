@@ -86,9 +86,15 @@ private:
    * @param cloud, frame_id
    */
   void publishRoughnessHeatMap(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
-    const Eigen::Vector4f & centroid,
-    const Eigen::Vector3f & normal,
-    const std::string & frame_id);
+    const std::string & frame_id,
+    const std::vector<float> & distances);
+
+  /**
+   * @brief This function calculate the roughness score.
+   *
+   * @param distance
+   */
+  float computeRoughnessScore(const std::vector<float> & distance);
 
 // Publisher
 rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
