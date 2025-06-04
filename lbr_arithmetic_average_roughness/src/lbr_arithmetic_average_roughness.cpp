@@ -39,22 +39,40 @@ ArithmeticAverageRoughness::~ArithmeticAverageRoughness()
 
 
 void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg){
+  static int counter = 0;
+  const int print_interval = 10; // Print every 10 messages
+
   // Convert from ROS message to PCL
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*msg, *cloud);
   if(cloud->empty()) return;
+
+  // Remove NaN values
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cleaned_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  std::vector<int> indices;
+  pcl::removeNaNFromPointCloud(*cloud, *cleaned_cloud, indices);
+  if(cleaned_cloud->empty()) return;
+
   // Downsample point cloud
-  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud = downsamplePointCloud(cloud);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud = downsamplePointCloud(cleaned_cloud);
   if(filtered_cloud->empty()) return;
+
   // Estimate plane & create heatmap
   Eigen::Vector4f centroid;
   Eigen::Vector3f normal;
   estimateRegressionPlane(filtered_cloud, centroid, normal);
+
   // Visualize estimated plane
   publishPlaneMarker(centroid, normal, msg->header.frame_id);
+
+  // Compute roughness score
   std::vector<float> distances = computePointToPlaneDistance(filtered_cloud, centroid, normal);
   float roughness_score = computeRoughnessScore(distances);
-  std::cout << "Roughness score:" << roughness_score << std::endl;
+  if (counter % print_interval == 0) {
+    std::cout << "Roughness score:" << roughness_score << std::endl;
+  }
+  counter++;
+
   // Visualize HeatMap
   publishRoughnessHeatMap(filtered_cloud, msg->header.frame_id, distances);
 }
