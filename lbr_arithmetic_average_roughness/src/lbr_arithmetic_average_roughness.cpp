@@ -79,10 +79,10 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
 {
-  // TODO: Add NaN value filtering
   pcl::VoxelGrid<pcl::PointXYZ> sor;
+  float voxel_size = 0.01f; // 1cm voxel size
   sor.setInputCloud(cloud);
-  sor.setLeafSize(0.01f, 0.01f, 0.01f); // 1cm voxel
+  sor.setLeafSize(voxel_size, voxel_size, voxel_size);
   pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   sor.filter(*filtered_cloud);
   return filtered_cloud;
