@@ -10,6 +10,12 @@ def generate_launch_description():
         'config',
         'arithmetic_average_roughness.rviz'
     )
+
+    urdf_path = os.path.join(
+        get_package_share_directory('lbr_arithmetic_average_roughness'),
+        'urdf',
+        'dummy_robot.urdf'
+    )
     return LaunchDescription([
         Node(
             package="lbr_arithmetic_average_roughness",
@@ -23,5 +29,12 @@ def generate_launch_description():
             name="rviz2",
             output="screen",
             arguments=['-d', rviz_config_path],
+        ),
+        Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            name='robot_state_publisher',
+            output='screen',
+            parameters=[{'robot_description': open(urdf_path).read()}],
         )
     ])

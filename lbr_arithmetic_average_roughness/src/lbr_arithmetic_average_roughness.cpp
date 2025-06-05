@@ -30,6 +30,9 @@ ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions
   point_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
     std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
+  // TF
+  tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 }
 
 ArithmeticAverageRoughness::~ArithmeticAverageRoughness()
@@ -41,10 +44,22 @@ ArithmeticAverageRoughness::~ArithmeticAverageRoughness()
 void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg){
   static int counter = 0;
   const int print_interval = 10; // Print every 10 messages
+  const std::string target_frame = "base_link";
+  const std::string source_frame = msg->header.frame_id;
+
+  // Transform point cloud from optical frame to base frame
+  geometry_msgs::msg::TransformStamped tf_msg_optical_to_base;
+  try{
+  tf_msg_optical_to_base = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(1000));
+  } catch (tf2::TransformException & ex) {
+    RCLCPP_WARN(this->get_logger(), "Could not transform point cloud from %s to %s: %s", source_frame.c_str(), target_frame.c_str(), ex.what());
+  }
+  sensor_msgs::msg::PointCloud2 transformed_cloud;
+  tf2::doTransform(*msg, transformed_cloud, tf_msg_optical_to_base);
 
   // Convert from ROS message to PCL
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*msg, *cloud);
+  pcl::fromROSMsg(transformed_cloud, *cloud);
   if(cloud->empty()) return;
 
   // Remove NaN values
@@ -63,7 +78,7 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   estimateRegressionPlane(filtered_cloud, centroid, normal);
 
   // Visualize estimated plane
-  publishPlaneMarker(centroid, normal, msg->header.frame_id);
+  publishPlaneMarker(centroid, normal, target_frame);
 
   // Compute roughness score
   std::vector<float> distances = computePointToPlaneDistance(filtered_cloud, centroid, normal);
@@ -74,7 +89,7 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   counter++;
 
   // Visualize HeatMap
-  publishRoughnessHeatMap(filtered_cloud, msg->header.frame_id, distances);
+  publishRoughnessHeatMap(filtered_cloud, target_frame, distances);
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
