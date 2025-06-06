@@ -31,6 +31,7 @@
 #include <pcl/common/centroid.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/filters/filter.h>
+#include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/filters/voxel_grid.h>
 #include <visualization_msgs/msg/marker.hpp>
 #include <geometry_msgs/msg/point.hpp>
@@ -64,6 +65,13 @@ private:
   pcl::PointCloud<pcl::PointXYZ>::Ptr downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud);
 
   /**
+   * @brief This function remove outlier from point cloud.
+   *
+   * @param cloud
+   */
+  pcl::PointCloud<pcl::PointXYZ>::Ptr removeOutlierFromPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud);
+
+  /**
    * @brief This function estimate the regression plane
    *
    * @param cloud, plane_centroid, plane_normal
@@ -85,6 +93,16 @@ private:
   std::vector<float> computePointToPlaneDistance(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
                                         const Eigen::Vector4f& plane_centroid,
                                         const Eigen::Vector3f& plane_normal);
+
+  /**
+   * @brief This function get inlier indices by distance.
+   *
+   * @param distances, threshold
+   */
+  std::vector<int> getInlierIndicesByDistance(
+    const std::vector<float> & distances,
+    float threshold
+  );
 
   /**
    * @brief This function publish the HeatMap calculated from the average height.

@@ -47,7 +47,7 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   const std::string target_frame = "base_link";
   const std::string source_frame = msg->header.frame_id;
 
-  // Transform point cloud from optical frame to base frame
+  // ****** Transform point cloud from optical frame to base frame ****** //
   geometry_msgs::msg::TransformStamped tf_msg_optical_to_base;
   try{
   tf_msg_optical_to_base = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(1000));
@@ -57,39 +57,55 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   sensor_msgs::msg::PointCloud2 transformed_cloud;
   tf2::doTransform(*msg, transformed_cloud, tf_msg_optical_to_base);
 
-  // Convert from ROS message to PCL
+  // ****** Convert from ROS message to PCL ****** //
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(transformed_cloud, *cloud);
   if(cloud->empty()) return;
 
-  // Remove NaN values
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cleaned_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  std::vector<int> indices;
-  pcl::removeNaNFromPointCloud(*cloud, *cleaned_cloud, indices);
-  if(cleaned_cloud->empty()) return;
+  // ****** Downsample point cloud ****** //
+  pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled_cloud = downsamplePointCloud(cloud);
+  if(downsampled_cloud->empty()) return;
 
-  // Downsample point cloud
-  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud = downsamplePointCloud(cleaned_cloud);
+  // ****** Remove NaN values ****** //
+  pcl::PointCloud<pcl::PointXYZ>::Ptr nan_removed_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  std::vector<int> indices;
+  pcl::removeNaNFromPointCloud(*downsampled_cloud, *nan_removed_cloud, indices);
+  if(nan_removed_cloud->empty()) return;
+
+  // ****** Remove outliers from point cloud ****** //
+  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud = removeOutlierFromPointCloud(nan_removed_cloud);
   if(filtered_cloud->empty()) return;
 
-  // Estimate plane & create heatmap
+  // ****** Estimate plane ****** //
   Eigen::Vector4f centroid;
   Eigen::Vector3f normal;
-  estimateRegressionPlane(filtered_cloud, centroid, normal);
+  estimateRegressionPlane(nan_removed_cloud, centroid, normal);
 
-  // Visualize estimated plane
+  // ****** Compute distances from the Estimated plane ****** //
+  std::vector<float> distances = computePointToPlaneDistance(nan_removed_cloud, centroid, normal);
+
+  //TODO: Need to modify here
+  // ****** Get inlier indices by distance threshold ****** //
+  std::vector<int> inlier_indices = getInlierIndicesByDistance(distances, 0.00005f); // 5cm threshold
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr inlier_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  for (int index : inlier_indices) {
+    inlier_cloud->points.push_back(nan_removed_cloud->points[index]);
+  }
+  if (inlier_cloud->empty()) return;
+
+  // ****** Visualize estimated plane ****** //
   publishPlaneMarker(centroid, normal, target_frame);
 
-  // Compute roughness score
-  std::vector<float> distances = computePointToPlaneDistance(filtered_cloud, centroid, normal);
+  // ****** Compute roughness score ****** //
   float roughness_score = computeRoughnessScore(distances);
   if (counter % print_interval == 0) {
     std::cout << "Roughness score:" << roughness_score << std::endl;
   }
   counter++;
 
-  // Visualize HeatMap
-  publishRoughnessHeatMap(filtered_cloud, target_frame, distances);
+  // ****** Visualize HeatMap ****** //
+  publishRoughnessHeatMap(nan_removed_cloud, target_frame, distances);
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
@@ -102,6 +118,16 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointC
   sor.filter(*filtered_cloud);
   return filtered_cloud;
 }
+
+pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::removeOutlierFromPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud){
+  pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+  sor.setInputCloud(cloud);
+  sor.setMeanK(50); // Number of nearest neighbors to analyze
+  sor.setStddevMulThresh(0.5); // Standard deviation multiplier threshold
+  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  sor.filter(*filtered_cloud);
+  return filtered_cloud;
+};
 
 void ArithmeticAverageRoughness::estimateRegressionPlane(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud, Eigen::Vector4f& plane_centroid, Eigen::Vector3f& plane_normal)
 {
@@ -220,6 +246,18 @@ std::vector<float> ArithmeticAverageRoughness::computePointToPlaneDistance(
     distances.push_back(distance);
   }
     return distances;
+}
+
+std::vector<int> ArithmeticAverageRoughness::getInlierIndicesByDistance(
+  const std::vector<float> & distances, float threshold)
+{
+  std::vector<int> indices;
+  for (size_t i = 0; i < distances.size(); ++i) {
+    if (distances[i] < threshold) {
+      indices.push_back(i);
+    }
+  }
+  return indices;
 }
 
 void ArithmeticAverageRoughness::publishRoughnessHeatMap(
