@@ -147,14 +147,14 @@ void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f& centr
   plane_marker.color.r = 0.0f;
   plane_marker.color.g = 1.0f;
   plane_marker.color.b = 0.0f;
-  plane_marker.color.a = 0.5f;
+  plane_marker.color.a = 0.3f;
 
   // Create a point on a plane by generating two vectors perpendicular to the normal
   Eigen::Vector3f basis1, basis2;
   basis1 = normal.unitOrthogonal();
   basis2 = normal.cross(basis1);
 
-  float plane_size = 0.5;
+  float plane_size = 0.7;
   Eigen::Vector3f center(centroid.head<3>());
 
   std::vector<Eigen::Vector3f> corners;
