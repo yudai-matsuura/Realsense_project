@@ -1,0 +1,12 @@
+<robot name="dummy_robot">
+    <link name="base_link">
+    </link>
+
+    <joint name="base_to_camera" type="fixed">
+        <parent link="base_link"/>
+        <child link="camera_link"/>
+        <origin xyz="0 0 0.3" rpy="0 0.700 0"/>
+    </joint>
+
+    <link name="camera_link"/>
+</robot>
