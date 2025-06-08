@@ -84,9 +84,8 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   // ****** Compute distances from the Estimated plane ****** //
   std::vector<float> distances = computePointToPlaneDistance(nan_removed_cloud, centroid, normal);
 
-  //TODO: Need to modify here
   // ****** Get inlier indices by distance threshold ****** //
-  std::vector<int> inlier_indices = getInlierIndicesByDistance(distances, 0.00005f); // 5cm threshold
+  std::vector<int> inlier_indices = getInlierIndicesByDistance(distances, 0.2f); // 20cm threshold
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr inlier_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   for (int index : inlier_indices) {
@@ -94,18 +93,24 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   }
   if (inlier_cloud->empty()) return;
 
+  // ****** Extract inlier distances ****** //
+  std::vector<float> inlier_distances;
+  for (int index : inlier_indices) {
+    inlier_distances.push_back(distances[index]);
+  }
+
   // ****** Visualize estimated plane ****** //
   publishPlaneMarker(centroid, normal, target_frame);
 
   // ****** Compute roughness score ****** //
-  float roughness_score = computeRoughnessScore(distances);
+  float roughness_score = computeRoughnessScore(inlier_distances);
   if (counter % print_interval == 0) {
     std::cout << "Roughness score:" << roughness_score << std::endl;
   }
   counter++;
 
   // ****** Visualize HeatMap ****** //
-  publishRoughnessHeatMap(nan_removed_cloud, target_frame, distances);
+  publishRoughnessHeatMap(inlier_cloud, target_frame, inlier_distances);
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
