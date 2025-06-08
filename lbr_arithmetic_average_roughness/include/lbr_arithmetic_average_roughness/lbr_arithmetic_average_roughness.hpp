@@ -100,8 +100,7 @@ private:
    * @param distances, threshold
    */
   std::vector<int> getInlierIndicesByDistance(
-    const std::vector<float> & distances,
-    float threshold
+    const std::vector<float> & distances
   );
 
   /**

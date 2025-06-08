@@ -83,8 +83,7 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   std::vector<float> distances = computePointToPlaneDistance(nan_removed_cloud, centroid, normal);
 
   // ****** Get Inlier Indices ****** //
-  float threshold_value = 0.2f; // [m]
-  std::vector<int> inlier_indices = getInlierIndicesByDistance(distances, threshold_value);
+  std::vector<int> inlier_indices = getInlierIndicesByDistance(distances);
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr inlier_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   for (int index : inlier_indices) {
@@ -100,9 +99,9 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
 
   // ****** Roughness Score ****** //
   static int counter = 0;
-  const int print_interval = 10; // Print every 10 messages
+  const int kPrintInterval = 10; // Print every 10 messages
   float roughness_score = computeRoughnessScore(inlier_distances);
-  if (counter % print_interval == 0) {
+  if (counter % kPrintInterval == 0) {
     std::cout << "Roughness score:" << roughness_score << std::endl;
   }
   counter++;
@@ -115,9 +114,9 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
 pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
 {
   pcl::VoxelGrid<pcl::PointXYZ> sor;
-  float voxel_size = 0.01f; // [m]
+  float kVoxelSize = 0.01f; // [m]
   sor.setInputCloud(cloud);
-  sor.setLeafSize(voxel_size, voxel_size, voxel_size);
+  sor.setLeafSize(kVoxelSize, kVoxelSize, kVoxelSize);
   pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   sor.filter(*filtered_cloud);
   return filtered_cloud;
@@ -125,9 +124,11 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointC
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::removeOutlierFromPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud){
   pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+  int kMeanK = 50; // Number of nearest neighbors to analyze
+  float kStddevMulThresh = 0.5f; // Standard deviation multiplier threshold
   sor.setInputCloud(cloud);
-  sor.setMeanK(50); // Number of nearest neighbors to analyze
-  sor.setStddevMulThresh(0.5); // Standard deviation multiplier threshold
+  sor.setMeanK(kMeanK);
+  sor.setStddevMulThresh(kStddevMulThresh);
   pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   sor.filter(*filtered_cloud);
   return filtered_cloud;
@@ -184,14 +185,14 @@ void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f& centr
   basis1 = normal.unitOrthogonal();
   basis2 = normal.cross(basis1);
 
-  float plane_size = 0.7;
+  float kPlaneSize = 0.7;
   Eigen::Vector3f center(centroid.head<3>());
 
   std::vector<Eigen::Vector3f> corners;
-  corners.push_back(center + plane_size * ( basis1 + basis2));
-  corners.push_back(center + plane_size * ( -basis1 + basis2));
-  corners.push_back(center + plane_size * ( -basis1 - basis2));
-  corners.push_back(center + plane_size * ( basis1 - basis2));
+  corners.push_back(center + kPlaneSize * ( basis1 + basis2));
+  corners.push_back(center + kPlaneSize * ( -basis1 + basis2));
+  corners.push_back(center + kPlaneSize * ( -basis1 - basis2));
+  corners.push_back(center + kPlaneSize * ( basis1 - basis2));
 
   // make square using two triangle
   geometry_msgs::msg::Point p0, p1, p2, p3;
@@ -253,11 +254,12 @@ std::vector<float> ArithmeticAverageRoughness::computePointToPlaneDistance(
 }
 
 std::vector<int> ArithmeticAverageRoughness::getInlierIndicesByDistance(
-  const std::vector<float> & distances, float threshold)
+  const std::vector<float> & distances)
 {
+  float kDistanceThreshold = 0.2f; // [m]
   std::vector<int> indices;
   for (size_t i = 0; i < distances.size(); ++i) {
-    if (distances[i] < threshold) {
+    if (distances[i] < kDistanceThreshold) {
       indices.push_back(i);
     }
   }
@@ -315,7 +317,7 @@ void ArithmeticAverageRoughness::publishRoughnessHeatMap(
 
 float ArithmeticAverageRoughness::computeRoughnessScore(const std::vector<float> & distances){
   float sq_sum = 0.0f;
-  float maximum_roughness = 0.05f; // Maximum roughness threshold in meters
+  float kMaximumRoughness = 0.05f; // Maximum roughness threshold in meters
   size_t filtered_pointcloud_number = distances.size();
 
   for (float point_distance : distances) {
@@ -323,7 +325,7 @@ float ArithmeticAverageRoughness::computeRoughnessScore(const std::vector<float>
   }
 
   float roughness_score = std::sqrt(sq_sum / filtered_pointcloud_number); // Standard deviation
-  float normalized_score = std::min(1.0f, roughness_score / maximum_roughness);
+  float normalized_score = std::min(1.0f, roughness_score / kMaximumRoughness);
   return normalized_score;
 }
 
