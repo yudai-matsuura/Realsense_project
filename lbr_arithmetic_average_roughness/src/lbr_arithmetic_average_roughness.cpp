@@ -285,8 +285,8 @@ void ArithmeticAverageRoughness::publishRoughnessHeatMap(
   heatmap_marker.lifetime = rclcpp::Duration::from_seconds(0);
 
   float max_distance = 0.0f;
-  for (const float & d : distances) {
-    if (d > max_distance) max_distance = d;
+  for (const float & point_distance : distances) {
+    if (point_distance > max_distance) max_distance = point_distance;
   }
 
   for (size_t i = 0; i < cloud->points.size(); ++i) {
