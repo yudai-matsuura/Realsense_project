@@ -31,6 +31,20 @@ PointCloudExtractor::~PointCloudExtractor()
   std::cout << "PointCloudExtractor class is destructed." << std::endl;
 }
 
+void bboxCallback (const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+{
+    bboxes_.clear();
+    const auto & data = msg->data;
+    for (size_t i = 0; i + 3 < data.size(); i += 4){
+        bboxes.push_back({data[i], data[i+1], data[i+2], data[i+3]});
+    }
+}
+
+bool isPointInBox(float u, float v, const std::array<float, 4> & bbox)
+{
+    return (u >= bbox[0] && u <= bbox[2] && v >= bbox[1] && v <= bbox[3]);
+}
+
 
 }  // namespace lbr_pointcloud_extractor
 
