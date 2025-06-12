@@ -17,6 +17,7 @@
 
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/msg/camera_info.hpp>
 #include <std_msgs/msg/float32_multi_array.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <librealsense2/rsutil.h>
@@ -89,7 +90,7 @@ private:
      */
     bool isPointInsideAABB(
       const pcl::PointXYZ & pt,
-      pcl::PointXYZ & min_point,
+      const pcl::PointXYZ & min_point,
       const pcl::PointXYZ & max_point);
 
     /**
@@ -101,10 +102,19 @@ private:
       const sensor_msgs::msg::PointCloud2 & input_cloud,
       const std::vector<AABB> & aabbs);
 
+    /**
+     * @brief
+     *
+     * @param msg
+     */
+    void cameraInfoCallback(
+      const sensor_msgs::msg::CameraInfo::SharedPtr msg);
+
 // Subscriber
 rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_sub_;
 rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_image_sub_;
 rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr bbox_sub_;
+rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;
 
 // Publisher
 rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr extracted_pointcloud_pub_;
@@ -112,6 +122,7 @@ rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr extracted_pointcloud
 // Variables
 sensor_msgs::msg::PointCloud2::SharedPtr latest_pointcloud_;
 sensor_msgs::msg::Image::SharedPtr latest_depth_image_;
+rs2_intrinsics camera_intrinsics_;
 };
 
 }  // namespace lbr_pointcloud_extractor

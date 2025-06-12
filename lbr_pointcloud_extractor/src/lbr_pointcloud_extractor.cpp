@@ -48,7 +48,11 @@ PointCloudExtractor::PointCloudExtractor(const rclcpp::NodeOptions & options)
 
   bbox_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
     "/bounding_boxes", rclcpp::SensorDataQoS(),
-    bboxCallback);
+    std::bind(&PointCloudExtractor::bboxCallback, this, std::placeholders::_1));
+
+    camera_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
+      "camera/camera/depth/camera_info", rclcpp::SensorDataQoS(),
+      std::bind(&PointCloudExtractor::cameraInfoCallback, this, std::placeholders::_1));
 }
 
 PointCloudExtractor::~PointCloudExtractor()
@@ -146,7 +150,7 @@ std::vector<AABB> PointCloudExtractor::generateAABBs(
 
 bool PointCloudExtractor::isPointInsideAABB(
   const pcl::PointXYZ & pt,
-  pcl::PointXYZ & min_point,
+  const pcl::PointXYZ & min_point,
   const pcl::PointXYZ & max_point)
   {
     return  (pt.x >= min_point.x && pt.x <= max_point.x) &&
@@ -163,7 +167,7 @@ sensor_msgs::msg::PointCloud2 PointCloudExtractor::filterPointCloudByAABBs(
     pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_output_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     for(const auto & pt : pcl_input_cloud->points) {
       for (const auto & aabb : aabbs) {
-        if(isPointInsideAABB(pt, aabb.min, aabb.max)) {
+        if(isPointInsideAABB(pt, pcl::PointXYZ(aabb.min.x, aabb.min.y, aabb.min.z), pcl::PointXYZ(aabb.max.x, aabb.max.y, aabb.max.z))) {
           pcl_output_cloud->points.push_back(pt);
           break;
         }
@@ -174,6 +178,19 @@ sensor_msgs::msg::PointCloud2 PointCloudExtractor::filterPointCloudByAABBs(
     pcl::toROSMsg(*pcl_output_cloud, output_cloud);
     output_cloud.header = input_cloud.header;
     return output_cloud;
+  }
+
+void PointCloudExtractor::cameraInfoCallback(
+  const sensor_msgs::msg::CameraInfo::SharedPtr msg)
+  {
+    camera_intrinsics_.width = msg->width;
+    camera_intrinsics_.height = msg->height;
+    camera_intrinsics_.ppx = msg->k[2];
+    camera_intrinsics_.ppy = msg->k[5];
+    camera_intrinsics_.fx = msg->k[0];
+    camera_intrinsics_.fy = msg->k[4];
+    camera_intrinsics_.model = RS2_DISTORTION_NONE;
+    std::copy(std::begin(msg->d), std::begin(msg->d) + 5, camera_intrinsics_.coeffs);
   }
 
 
