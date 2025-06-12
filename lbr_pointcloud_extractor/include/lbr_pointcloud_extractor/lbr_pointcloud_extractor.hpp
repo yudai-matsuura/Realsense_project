@@ -16,8 +16,15 @@
 #define LBR_POINTCLOUD_EXTRACTOR__LBR_POINTCLOUD_EXTRACTOR_HPP_
 
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <sensor_msgs/msg/image.hpp>
 #include <std_msgs/msg/float32_multi_array.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <librealsense2/rsutil.h>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <vector>
+#include <limits>
 
 #include "lbr_pointcloud_extractor/visibility_control.h"
 
@@ -34,31 +41,77 @@ LBR_POINTCLOUD_EXTRACTOR_PUBLIC
 
 private:
     /**
-     * @brief This function separate the bbox by 4 elements.
+     * @brief
      *
      * @param msg
      */
-    void bboxCallback(
-        const std_msgs::msg::Float32MultiArray::SharedPtr msg);
+    void pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
+
+    /**
+     * @brief
+     *
+     * @param msg
+     */
+    void depthImageCallback(const sensor_msgs::msg::Image::SharedPtr msg);
+
+    /**
+     * @brief
+     *
+     * @param msg
+     */
+    void bboxCallback(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
+
+    /**
+     * @brief This function separate the bbox by 4 elements.
+     *
+     * @param depth_img
+     * @param u, v
+     */
+    float getDepth(
+      const sensor_msgs::msg::Image & depth_img, int u, int v);
+
+    /**
+     * @brief This function separate the bbox by 4 elements.
+     *
+     * @param bbox_msg
+     * @param depth_img
+     * @param intrinsics
+     */
+    std::vector<AABB> generateAABBs(
+      const std_msgs::msg::Float32MultiArray::SharedPtr bbox_msg,
+      const sensor_msgs::msg::Image & depth_img,
+      const rs2_intrinsics & intrinsics);
 
     /**
      * @brief This function check  if the point is inside the bounding box.
      *
-     * @param u, v, bbox
+     * @param pt, min_point, max_point
      */
-    bool isPointInBox(
-        float u, float v, const std::array<float, 4> & bbox);
+    bool isPointInsideAABB(
+      const pcl::PointXYZ & pt,
+      pcl::PointXYZ & min_point,
+      const pcl::PointXYZ & max_point);
+
+    /**
+     * @brief
+     *
+     * @param input_cloud, aabbs
+     */
+    sensor_msgs::msg::PointCloud2 filterPointCloudByAABBs(
+      const sensor_msgs::msg::PointCloud2 & input_cloud,
+      const std::vector<AABB> & aabbs);
 
 // Subscriber
 rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_sub_;
+rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_image_sub_;
 rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr bbox_sub_;
 
 // Publisher
-rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_pub_;
+rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr extracted_pointcloud_pub_;
 
 // Variables
-std::vector<std::array<float, 4>> bboxes_;  // Store bounding boxes as [x_min, y_min, z_min, x_max, y_max, z_max]
-
+sensor_msgs::msg::PointCloud2::SharedPtr latest_pointcloud_;
+sensor_msgs::msg::Image::SharedPtr latest_depth_image_;
 };
 
 }  // namespace lbr_pointcloud_extractor
