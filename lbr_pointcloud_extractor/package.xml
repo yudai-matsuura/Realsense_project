@@ -4,7 +4,7 @@
   <name>lbr_pointcloud_extractor</name>
   <version>0.0.0</version>
   <description>Extract point cloud from estimated region from RGB image</description>
-  <maintainer email="matsuura.yudai.q5@dc.tohoku.ac.jp">go2laptop</maintainer>
+  <maintainer email="matsuura.yudai.q5@dc.tohoku.ac.jp">yudaimatsuura</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake_ros</buildtool_depend>
@@ -15,6 +15,9 @@
   <depend>pcl_conversions</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
+  <depend>cv_bridge</depend>
+  <depend>opencv4</depend>
+  <depend>librealsense2</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

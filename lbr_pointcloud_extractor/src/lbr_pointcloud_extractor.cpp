@@ -19,15 +19,6 @@
 #define DEBUG_ENABLED false
 namespace lbr_pointcloud_extractor
 {
-struct Point3D
-{
-  float x, y, z;
-};
-struct AABB
-{
-  Point3D min;
-  Point3D max;
-};
 
 PointCloudExtractor::PointCloudExtractor(const rclcpp::NodeOptions & options)
 : rclcpp::Node("lbr_pointcloud_extractor", options)
@@ -81,13 +72,31 @@ void PointCloudExtractor::bboxCallback(const std_msgs::msg::Float32MultiArray::S
   extracted_pointcloud_pub_->publish(filtered_pc);
 }
 
-// TODO: Need to check how to get depth from the point in RGB
-// HACK: Maybe we can use "align_depth.enable" when launch
-float PointCloudExtractor::getDepth(const sensor_msgs::msg::Image & depth_img, int u, int v)
+// TODO: Need to understand how to get depth from the point in RGB
+// HACK: We should use "align_depth.enable" when launch
+float PointCloudExtractor::getDepthAtPixel(const sensor_msgs::msg::Image & depth_img, int u, int v)
 {
-  const int index = v * depth_img.step + u * 2;
-  uint16_t depth_raw = *(reinterpret_cast<const uint16_t*>(&depth_img.data[index]));
-  return static_cast<float>(depth_raw) * 0.001f;
+  if (depth_img.encoding != sensor_msgs::image_encodings::TYPE_16UC1) {
+    RCLCPP_WARN(this->get_logger(), "Depth image encoding is not 16UC1");
+    return 0.0f;
+  }
+  if (u < 0 || u >= static_cast<int>(depth_img.width) || v < 0 || v >= static_cast<int>(depth_img.height)) {
+    return 0.0f;
+  }
+  try {
+    // Convert ROS2 image to OpenCV Mat
+    cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvShare(std::make_shared<sensor_msgs::msg::Image>(depth_img), depth_img.encoding);
+    const cv::Mat & depth_image = cv_ptr->image;
+    uint16_t depth_mm = depth_image.at<uint16_t>(v, u);
+    if (depth_mm == 0) {
+      return 0.0f; // No depth information
+    }
+    float depth_m = static_cast<float>(depth_mm) * 0.001f; // Convert [mm] to [m]
+    return depth_m;
+  } catch (const std::exception & e) {
+    RCLCPP_ERROR(this->get_logger(), "Exception in getDepthAtPixel: %s", e.what());
+    return 0.0f;
+  }
 }
 
 std::vector<AABB> PointCloudExtractor::generateAABBs(
@@ -115,7 +124,7 @@ std::vector<AABB> PointCloudExtractor::generateAABBs(
     for(const auto & corner : corners) {
       int u = corner.first;
       int v = corner.second;
-      float depth = getDepth(depth_img, u, v);
+      float depth = getDepthAtPixel(depth_img, u, v);
       if (depth == 0.0f || std::isnan(depth)) {
         continue;
       }

@@ -21,6 +21,8 @@
 #include <std_msgs/msg/float32_multi_array.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <librealsense2/rsutil.h>
+#include <cv_bridge/cv_bridge.h>
+#include <opencv2/opencv.hpp>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -31,6 +33,15 @@
 
 namespace lbr_pointcloud_extractor
 {
+  struct Point3D
+  {
+    float x, y, z;
+  };
+  struct AABB
+  {
+    Point3D min;
+    Point3D max;
+  };
 
 class PointCloudExtractor : public rclcpp::Node
 {
@@ -63,12 +74,12 @@ private:
     void bboxCallback(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
 
     /**
-     * @brief This function separate the bbox by 4 elements.
+     * @brief This function get depth value at the pixel (u, v) from the depth image.
      *
      * @param depth_img
      * @param u, v
      */
-    float getDepth(
+    float getDepthAtPixel(
       const sensor_msgs::msg::Image & depth_img, int u, int v);
 
     /**
