@@ -28,6 +28,7 @@ ament_auto_add_executable(lbr_pointcloud_extractor_node
 
 # install launch file
 install(DIRECTORY
+  launch
   DESTINATION share/${PROJECT_NAME}/
 )
 
