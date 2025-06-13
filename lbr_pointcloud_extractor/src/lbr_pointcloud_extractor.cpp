@@ -26,7 +26,7 @@ PointCloudExtractor::PointCloudExtractor(const rclcpp::NodeOptions & options)
   std::cout << "PointCloudExtractor class is established." << std::endl;
   // Publisher
   extracted_pointcloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-    "pointcloud_inside_bounding_box", 10);
+    "/pointcloud_inside_bounding_box", 10);
 
   // Subscriber
   pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -34,15 +34,15 @@ PointCloudExtractor::PointCloudExtractor(const rclcpp::NodeOptions & options)
     std::bind(&PointCloudExtractor::pointCloudCallback, this, std::placeholders::_1));
 
   depth_image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
-    "camera/camera/aligned_depth_to_color/image_raw", rclcpp::SensorDataQoS(),
+    "/camera/camera/aligned_depth_to_color/image_raw", rclcpp::SensorDataQoS(),
     std::bind(&PointCloudExtractor::depthImageCallback, this, std::placeholders::_1));
 
   bbox_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-    "/bounding_boxes", rclcpp::SensorDataQoS(),
+    "/yolo_bboxes", rclcpp::SensorDataQoS(),
     std::bind(&PointCloudExtractor::bboxCallback, this, std::placeholders::_1));
 
   camera_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
-    "camera/camera/aligned_depth_to_color/camera_info", rclcpp::SensorDataQoS(),
+    "/camera/camera/aligned_depth_to_color/camera_info", rclcpp::SensorDataQoS(),
     std::bind(&PointCloudExtractor::cameraInfoCallback, this, std::placeholders::_1));
 }
 
