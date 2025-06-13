@@ -34,16 +34,16 @@ PointCloudExtractor::PointCloudExtractor(const rclcpp::NodeOptions & options)
     std::bind(&PointCloudExtractor::pointCloudCallback, this, std::placeholders::_1));
 
   depth_image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
-    "camera/camera/depth/image_rect_raw", rclcpp::SensorDataQoS(),
+    "camera/camera/aligned_depth_to_color/image_raw", rclcpp::SensorDataQoS(),
     std::bind(&PointCloudExtractor::depthImageCallback, this, std::placeholders::_1));
 
   bbox_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
     "/bounding_boxes", rclcpp::SensorDataQoS(),
     std::bind(&PointCloudExtractor::bboxCallback, this, std::placeholders::_1));
 
-    camera_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
-      "camera/camera/depth/camera_info", rclcpp::SensorDataQoS(),
-      std::bind(&PointCloudExtractor::cameraInfoCallback, this, std::placeholders::_1));
+  camera_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
+    "camera/camera/aligned_depth_to_color/camera_info", rclcpp::SensorDataQoS(),
+    std::bind(&PointCloudExtractor::cameraInfoCallback, this, std::placeholders::_1));
 }
 
 PointCloudExtractor::~PointCloudExtractor()
@@ -72,7 +72,6 @@ void PointCloudExtractor::bboxCallback(const std_msgs::msg::Float32MultiArray::S
   extracted_pointcloud_pub_->publish(filtered_pc);
 }
 
-// TODO: Need to understand how to get depth from the point in RGB
 // HACK: We should use "align_depth.enable" when launch
 float PointCloudExtractor::getDepthAtPixel(const sensor_msgs::msg::Image & depth_img, int u, int v)
 {
@@ -113,8 +112,6 @@ std::vector<AABB> PointCloudExtractor::generateAABBs(
     float y_max = data[i + 3];
 
     std::vector<Point3D> points_3d;
-
-    //TODO: Need to understand here
     std::vector<std::pair<int, int>> corners = {
       {static_cast<int>(x_min), static_cast<int>(y_min)},
       {static_cast<int>(x_max), static_cast<int>(y_min)},
