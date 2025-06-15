@@ -26,6 +26,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <visualization_msgs/msg/marker.hpp>
 #include <vector>
 #include <limits>
 
@@ -121,6 +122,24 @@ private:
     void cameraInfoCallback(
       const sensor_msgs::msg::CameraInfo::SharedPtr msg);
 
+    /**
+     * @brief
+     *
+     * @param aabbs, frame_id
+     */
+    void publishAABBMarker(
+      const std::vector<AABB> & aabbs,
+      const std::string & frame_id);
+
+    /**
+     * @brief
+     *
+     * @param points_3d, frame_id
+     */
+    void publishAABBCorners(
+      const std::vector<Point3D> & points_3d,
+      const std::string & frame_id);
+
 // Subscriber
 rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_sub_;
 rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_image_sub_;
@@ -129,6 +148,7 @@ rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;
 
 // Publisher
 rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr extracted_pointcloud_pub_;
+rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
 
 // Variables
 sensor_msgs::msg::PointCloud2::SharedPtr latest_pointcloud_;

@@ -28,6 +28,9 @@ PointCloudExtractor::PointCloudExtractor(const rclcpp::NodeOptions & options)
   extracted_pointcloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
     "/pointcloud_inside_bounding_box", 10);
 
+  marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(
+    "/aabb_marker", 10);
+
   // Subscriber
   pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
@@ -70,6 +73,7 @@ void PointCloudExtractor::bboxCallback(const std_msgs::msg::Float32MultiArray::S
   auto filtered_pc = filterPointCloudByAABBs(*latest_pointcloud_, aabbs);
 
   extracted_pointcloud_pub_->publish(filtered_pc);
+  publishAABBMarker(aabbs, latest_pointcloud_->header.frame_id);
 }
 
 // HACK: We should use "align_depth.enable" when launch
@@ -134,6 +138,7 @@ std::vector<AABB> PointCloudExtractor::generateAABBs(
     if (points_3d.empty()) {
       continue;
     }
+    publishAABBCorners(points_3d, latest_pointcloud_->header.frame_id);
 
     Point3D min_point = { std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max() };
     Point3D max_point = { std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest() };
@@ -152,6 +157,76 @@ std::vector<AABB> PointCloudExtractor::generateAABBs(
   }
 
   return aabbs;
+}
+
+void PointCloudExtractor::publishAABBCorners(const std::vector<Point3D> & points_3d, const std::string & frame_id)
+{
+  // --------------------------
+  // Visualize AABB corners
+  // --------------------------
+  visualization_msgs::msg::Marker aabb_corners_marker;
+  aabb_corners_marker.header.frame_id = frame_id;
+  aabb_corners_marker.header.stamp = this->now();
+  aabb_corners_marker.ns = "aabb_corners";
+  aabb_corners_marker.id = 0;
+  aabb_corners_marker.type = visualization_msgs::msg::Marker::SPHERE_LIST;
+  aabb_corners_marker.action = visualization_msgs::msg::Marker::ADD;
+  aabb_corners_marker.lifetime = rclcpp::Duration::from_seconds(0);
+  aabb_corners_marker.scale.x = 0.02; // Sphere size
+  aabb_corners_marker.scale.y = 0.02;
+  aabb_corners_marker.scale.z = 0.02;
+
+  for (const auto & point : points_3d) {
+    geometry_msgs::msg::Point ros_point;
+    ros_point.x = point.x;
+    ros_point.y = point.y;
+    ros_point.z = point.z;
+    aabb_corners_marker.points.push_back(ros_point);
+
+    std_msgs::msg::ColorRGBA color;
+    color.r = 1.0f; // Red
+    color.g = 0.0f;
+    color.b = 0.0f;
+    color.a = 1.0f; // Opaque
+    aabb_corners_marker.colors.push_back(color);
+  }
+
+  marker_pub_->publish(aabb_corners_marker);
+}
+
+void PointCloudExtractor::publishAABBMarker(const std::vector<AABB> & aabbs, const std::string & frame_id)
+{
+  // --------------------------
+  // Visualize AABB
+  // --------------------------
+  int id = 0;
+  for (const auto & aabb : aabbs) {
+  visualization_msgs::msg::Marker aabb_marker;
+  aabb_marker.header.frame_id = frame_id;
+  aabb_marker.header.stamp = this->now();
+  aabb_marker.ns = "aabb";
+  aabb_marker.id = id++;
+  aabb_marker.type = visualization_msgs::msg::Marker::CUBE;
+  aabb_marker.action = visualization_msgs::msg::Marker::ADD;
+  aabb_marker.lifetime = rclcpp::Duration::from_seconds(0);
+
+  aabb_marker.pose.position.x = (aabb.min.x + aabb.max.x) / 2.0;
+  aabb_marker.pose.position.y = (aabb.min.y + aabb.max.y) / 2.0;
+  aabb_marker.pose.position.z = (aabb.min.z + aabb.max.z) / 2.0;
+  aabb_marker.pose.orientation.x =0.0;
+  aabb_marker.pose.orientation.y = 0.0;
+  aabb_marker.pose.orientation.z = 0.0;
+  aabb_marker.pose.orientation.w = 1.0; // No rotation
+  aabb_marker.scale.x = aabb.max.x - aabb.min.x;
+  aabb_marker.scale.y = aabb.max.y - aabb.min.y;
+  aabb_marker.scale.z = aabb.max.z - aabb.min.z;
+  aabb_marker.color.r = 0.0f;
+  aabb_marker.color.g = 1.0f;
+  aabb_marker.color.b = 0.0f;
+  aabb_marker.color.a = 0.4f;
+
+  marker_pub_->publish(aabb_marker);
+  }
 }
 
 bool PointCloudExtractor::isPointInsideAABB(
