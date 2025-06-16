@@ -62,6 +62,13 @@ void PointCloudExtractor::depthImageCallback(const sensor_msgs::msg::Image::Shar
 void PointCloudExtractor::bboxCallback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
 {
   std::cout << "bboxCallback Successfully " << std::endl;
+  if (!latest_depth_image_ || camera_intrinsics_.width == 0) {
+    RCLCPP_WARN_THROTTLE(
+      this->get_logger(), *this->get_clock(), 5000,
+      "Depth image or camera intrinsics not available yet. skipping callback"
+    );
+    return;
+  }
   if (!latest_depth_image_) return;
 
   // ****** Get BBox coordinate ****** //
@@ -144,15 +151,33 @@ sensor_msgs::msg::PointCloud2 PointCloudExtractor::extractPointCloudFromBBoxes(
 {
   pcl::PointCloud<pcl::PointXYZ>::Ptr extracted_cloud(new pcl::PointCloud<pcl::PointXYZ>);
 
+  cv_bridge::CvImageConstPtr cv_ptr;
+  try {
+    cv_ptr = cv_bridge::toCvShare(std::make_shared<sensor_msgs::msg::Image>(depth_img), depth_img.encoding);
+  } catch (const std::exception & e){
+    RCLCPP_ERROR(this->get_logger(), "cv_bridge exception: %s", e.what());
+    // Return an empty point cloud if conversion fails
+    sensor_msgs::msg::PointCloud2 empty_cloud;
+    empty_cloud.header.stamp = this->now();
+    empty_cloud.header.frame_id = "camera_color_optical_frame";
+    return empty_cloud;
+  }
+  const cv::Mat & depth_image_mat = cv_ptr->image;
+
   for (const auto bbox : bboxes) {
     for (int v = bbox.y_min; v <= bbox.y_max; ++v) {
       for (int u = bbox.x_min; u <= bbox.x_max; ++u) {
-        float depth = getDepthAtPixel(depth_img, u, v);
+        // Use the pre-converted cv::Mat directly for high efficiency
+        uint16_t depth_mm = depth_image_mat.at<uint16_t>(v, u);
+        if (depth_mm == 0) {
+            continue; // No depth information
+        }
+        float depth_m = static_cast<float>(depth_mm) * 0.001f;
 
-        if (depth > 0.0f && !std::isnan(depth)) {
+        if (depth_m > 0.0f && !std::isnan(depth_m)) {
           float pixel[2] = {static_cast<float>(u), static_cast<float>(v)};
           float point[3];
-          rs2_deproject_pixel_to_point(point, &camera_intrinsics_, pixel, depth);
+          rs2_deproject_pixel_to_point(point, &camera_intrinsics_, pixel, depth_m);
 
           if (std::isfinite(point[0]) && std::isfinite(point[1]) && std::isfinite(point[2])) {
             pcl::PointXYZ pcl_point(point[0], point[1], point[2]);
