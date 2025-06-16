@@ -7,18 +7,28 @@ endif()
 
 # find dependencies
 find_package(ament_cmake_auto REQUIRED)
+find_package(realsense2 REQUIRED)
+find_package(OpenCV REQUIRED)
 
 ament_auto_find_build_dependencies()
 
 ament_auto_add_library(lbr_pointcloud_extractor src/lbr_pointcloud_extractor.cpp)
+target_link_libraries(lbr_pointcloud_extractor
+  realsense2::realsense2
+)
 rclcpp_components_register_nodes(lbr_pointcloud_extractor "lbr_pointcloud_extractor::PointCloudExtractor")
 
 ament_auto_add_executable(lbr_pointcloud_extractor_node
   src/lbr_pointcloud_extractor_node.cpp
   src/lbr_pointcloud_extractor.cpp)
 
+  target_link_libraries(lbr_pointcloud_extractor_node
+  realsense2::realsense2
+)
+
 # install launch file
 install(DIRECTORY
+  launch
   DESTINATION share/${PROJECT_NAME}/
 )
 

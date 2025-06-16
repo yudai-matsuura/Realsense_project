@@ -27,9 +27,14 @@ ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions
   // Publisher
   marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("estimated_plane_marker", 10);
   // Subscriber
+  // point_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+  //   "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
+  //   std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
+
   point_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
+    "/pointcloud_inside_bounding_box", rclcpp::SensorDataQoS(),
     std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
+
   // TF
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
