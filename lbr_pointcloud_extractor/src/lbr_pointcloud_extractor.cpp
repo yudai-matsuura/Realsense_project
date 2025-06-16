@@ -82,7 +82,7 @@ void PointCloudExtractor::bboxCallback(const std_msgs::msg::Float32MultiArray::S
   const std::string source_frame = "camera_color_optical_frame";
   geometry_msgs::msg::TransformStamped tf_msg_optical_to_base;
   try{
-  tf_msg_optical_to_base = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(1000));
+  tf_msg_optical_to_base = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(100));
   } catch (tf2::TransformException & ex) {
     RCLCPP_WARN(this->get_logger(), "Could not transform point cloud from %s to %s: %s", source_frame.c_str(), target_frame.c_str(), ex.what());
     return;
