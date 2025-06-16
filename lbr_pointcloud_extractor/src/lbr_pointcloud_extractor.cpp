@@ -28,13 +28,7 @@ PointCloudExtractor::PointCloudExtractor(const rclcpp::NodeOptions & options)
   extracted_pointcloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
     "/pointcloud_inside_bounding_box", 10);
 
-  marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(
-    "/aabb_marker", 10);
-
   // Subscriber
-  pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
-    std::bind(&PointCloudExtractor::pointCloudCallback, this, std::placeholders::_1));
 
   depth_image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
     "/camera/camera/aligned_depth_to_color/image_raw", rclcpp::SensorDataQoS(),
@@ -47,6 +41,10 @@ PointCloudExtractor::PointCloudExtractor(const rclcpp::NodeOptions & options)
   camera_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
     "/camera/camera/aligned_depth_to_color/camera_info", rclcpp::SensorDataQoS(),
     std::bind(&PointCloudExtractor::cameraInfoCallback, this, std::placeholders::_1));
+
+  // TF
+  tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 }
 
 PointCloudExtractor::~PointCloudExtractor()
@@ -55,25 +53,40 @@ PointCloudExtractor::~PointCloudExtractor()
 }
 
 
-void PointCloudExtractor::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
-{
-  latest_pointcloud_ = msg;
-}
-
 void PointCloudExtractor::depthImageCallback(const sensor_msgs::msg::Image::SharedPtr msg)
 {
+  std::cout << "depthImageCallback Successfully " << std::endl;
   latest_depth_image_ = msg;
 }
 
 void PointCloudExtractor::bboxCallback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
 {
-  if (!latest_pointcloud_ || !latest_depth_image_) return;
+  std::cout << "bboxCallback Successfully " << std::endl;
+  if (!latest_depth_image_) return;
 
-  auto aabbs = generateAABBs(msg, * latest_depth_image_, camera_intrinsics_);
-  auto filtered_pc = filterPointCloudByAABBs(*latest_pointcloud_, aabbs);
+  // ****** Get BBox coordinate ****** //
+  auto bboxes = extractBBoxCoordinates(msg);
+  std::cout << "get bbox coordinate Successfully " << std::endl;
 
-  extracted_pointcloud_pub_->publish(filtered_pc);
-  publishAABBMarker(aabbs, latest_pointcloud_->header.frame_id);
+  // ****** Extract point cloud ****** //
+  auto extracted_cloud = extractPointCloudFromBBoxes(bboxes, *latest_depth_image_);
+  std::cout << "Extracted Successfully " << std::endl;
+
+  // ****** Transform ****** //
+  const std::string target_frame = "base_link";
+  const std::string source_frame = "camera_color_optical_frame";
+  geometry_msgs::msg::TransformStamped tf_msg_optical_to_base;
+  try{
+  tf_msg_optical_to_base = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(1000));
+  } catch (tf2::TransformException & ex) {
+    RCLCPP_WARN(this->get_logger(), "Could not transform point cloud from %s to %s: %s", source_frame.c_str(), target_frame.c_str(), ex.what());
+  }
+  sensor_msgs::msg::PointCloud2 transformed_cloud;
+  tf2::doTransform(extracted_cloud, transformed_cloud, tf_msg_optical_to_base);
+  std::cout << "Transformed Successfully " << std::endl;
+
+
+  extracted_pointcloud_pub_->publish(transformed_cloud);
 }
 
 // HACK: We should use "align_depth.enable" when launch
@@ -102,164 +115,66 @@ float PointCloudExtractor::getDepthAtPixel(const sensor_msgs::msg::Image & depth
   }
 }
 
-std::vector<AABB> PointCloudExtractor::generateAABBs(
-  const std_msgs::msg::Float32MultiArray::SharedPtr bbox_msg,
-  const sensor_msgs::msg::Image & depth_img,
-  const rs2_intrinsics & intrinsics)
+std::vector<BBox2D> PointCloudExtractor::extractBBoxCoordinates(
+  const std_msgs::msg::Float32MultiArray::SharedPtr bbox_msg)
 {
-  std::vector<AABB> aabbs;
+  std::vector<BBox2D> bboxes;
   const auto & data = bbox_msg->data;
+
   for (size_t i = 0; i + 3 < data.size(); i += 4) {
-    float x_min = data[i];
-    float y_min = data[i + 1];
-    float x_max = data[i + 2];
-    float y_max = data[i + 3];
+    BBox2D bbox;
+    bbox.x_min = static_cast<int>(std::max(0.0f, data[i]));
+    bbox.y_min = static_cast<int>(std::max(0.0f, data[i + 1]));
+    bbox.x_max = static_cast<int>(data[i + 2]);
+    bbox.y_max = static_cast<int>(data[i + 3]);
 
-    std::vector<Point3D> points_3d;
-    std::vector<std::pair<int, int>> corners = {
-      {static_cast<int>(x_min), static_cast<int>(y_min)},
-      {static_cast<int>(x_max), static_cast<int>(y_min)},
-      {static_cast<int>(x_min), static_cast<int>(y_max)},
-      {static_cast<int>(x_max), static_cast<int>(y_max)}
-    };
-    for(const auto & corner : corners) {
-      int u = corner.first;
-      int v = corner.second;
-      float depth = getDepthAtPixel(depth_img, u, v);
-      if (depth == 0.0f || std::isnan(depth)) {
-        continue;
-      }
-
-      float pixel[2] = { static_cast<float>(u), static_cast<float>(v) };
-      float point[3];
-      rs2_deproject_pixel_to_point(point, &intrinsics, pixel, depth);
-      points_3d.push_back({ point[0], point[1], point[2] });
-    }
-    if (points_3d.empty()) {
-      continue;
-    }
-    publishAABBCorners(points_3d, latest_pointcloud_->header.frame_id);
-
-    Point3D min_point = { std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max() };
-    Point3D max_point = { std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest() };
-
-    for (const auto & point : points_3d) {
-      min_point.x = std::min(min_point.x, point.x);
-      min_point.y = std::min(min_point.y, point.y);
-      min_point.z = std::min(min_point.z, point.z);
-
-      max_point.x = std::max(max_point.x, point.x);
-      max_point.y = std::max(max_point.y, point.y);
-      max_point.z = std::max(max_point.z, point.z);
+    if (latest_depth_image_) {
+      bbox.x_max = std::min(bbox.x_max, static_cast<int>(latest_depth_image_->width - 1));
+      bbox.y_max = std::min(bbox.y_max, static_cast<int>(latest_depth_image_->height - 1));
     }
 
-    aabbs.push_back({min_point, max_point});
+    bboxes.push_back(bbox);
   }
-
-  return aabbs;
+  return bboxes;
 }
 
-void PointCloudExtractor::publishAABBCorners(const std::vector<Point3D> & points_3d, const std::string & frame_id)
+sensor_msgs::msg::PointCloud2 PointCloudExtractor::extractPointCloudFromBBoxes(
+  const std::vector<BBox2D> & bboxes,
+  const sensor_msgs::msg::Image & depth_img)
 {
-  // --------------------------
-  // Visualize AABB corners
-  // --------------------------
-  visualization_msgs::msg::Marker aabb_corners_marker;
-  aabb_corners_marker.header.frame_id = frame_id;
-  aabb_corners_marker.header.stamp = this->now();
-  aabb_corners_marker.ns = "aabb_corners";
-  aabb_corners_marker.id = 0;
-  aabb_corners_marker.type = visualization_msgs::msg::Marker::SPHERE_LIST;
-  aabb_corners_marker.action = visualization_msgs::msg::Marker::ADD;
-  aabb_corners_marker.lifetime = rclcpp::Duration::from_seconds(0);
-  aabb_corners_marker.scale.x = 0.02; // Sphere size
-  aabb_corners_marker.scale.y = 0.02;
-  aabb_corners_marker.scale.z = 0.02;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr extracted_cloud(new pcl::PointCloud<pcl::PointXYZ>);
 
-  for (const auto & point : points_3d) {
-    geometry_msgs::msg::Point ros_point;
-    ros_point.x = point.x;
-    ros_point.y = point.y;
-    ros_point.z = point.z;
-    aabb_corners_marker.points.push_back(ros_point);
+  for (const auto bbox : bboxes) {
+    for (int v = bbox.y_min; v <= bbox.y_max; ++v) {
+      for (int u = bbox.x_min; u <= bbox.x_max; ++u) {
+        float depth = getDepthAtPixel(depth_img, u, v);
 
-    std_msgs::msg::ColorRGBA color;
-    color.r = 1.0f; // Red
-    color.g = 0.0f;
-    color.b = 0.0f;
-    color.a = 1.0f; // Opaque
-    aabb_corners_marker.colors.push_back(color);
-  }
+        if (depth > 0.0f && !std::isnan(depth)) {
+          float pixel[2] = {static_cast<float>(u), static_cast<float>(v)};
+          float point[3];
+          rs2_deproject_pixel_to_point(point, &camera_intrinsics_, pixel, depth);
 
-  marker_pub_->publish(aabb_corners_marker);
-}
-
-void PointCloudExtractor::publishAABBMarker(const std::vector<AABB> & aabbs, const std::string & frame_id)
-{
-  // --------------------------
-  // Visualize AABB
-  // --------------------------
-  int id = 0;
-  for (const auto & aabb : aabbs) {
-  visualization_msgs::msg::Marker aabb_marker;
-  aabb_marker.header.frame_id = frame_id;
-  aabb_marker.header.stamp = this->now();
-  aabb_marker.ns = "aabb";
-  aabb_marker.id = id++;
-  aabb_marker.type = visualization_msgs::msg::Marker::CUBE;
-  aabb_marker.action = visualization_msgs::msg::Marker::ADD;
-  aabb_marker.lifetime = rclcpp::Duration::from_seconds(0);
-
-  aabb_marker.pose.position.x = (aabb.min.x + aabb.max.x) / 2.0;
-  aabb_marker.pose.position.y = (aabb.min.y + aabb.max.y) / 2.0;
-  aabb_marker.pose.position.z = (aabb.min.z + aabb.max.z) / 2.0;
-  aabb_marker.pose.orientation.x =0.0;
-  aabb_marker.pose.orientation.y = 0.0;
-  aabb_marker.pose.orientation.z = 0.0;
-  aabb_marker.pose.orientation.w = 1.0; // No rotation
-  aabb_marker.scale.x = aabb.max.x - aabb.min.x;
-  aabb_marker.scale.y = aabb.max.y - aabb.min.y;
-  aabb_marker.scale.z = aabb.max.z - aabb.min.z;
-  aabb_marker.color.r = 0.0f;
-  aabb_marker.color.g = 1.0f;
-  aabb_marker.color.b = 0.0f;
-  aabb_marker.color.a = 0.4f;
-
-  marker_pub_->publish(aabb_marker);
-  }
-}
-
-bool PointCloudExtractor::isPointInsideAABB(
-  const pcl::PointXYZ & pt,
-  const pcl::PointXYZ & min_point,
-  const pcl::PointXYZ & max_point)
-  {
-    return  (pt.x >= min_point.x && pt.x <= max_point.x) &&
-            (pt.y >= min_point.y && pt.y <= max_point.y) &&
-            (pt.z >= min_point.z && pt.z <= max_point.z);
-  }
-
-sensor_msgs::msg::PointCloud2 PointCloudExtractor::filterPointCloudByAABBs(
-  const sensor_msgs::msg::PointCloud2 & input_cloud,
-  const std::vector<AABB> & aabbs)
-  {
-    pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_input_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::fromROSMsg(input_cloud,  *pcl_input_cloud);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_output_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    for(const auto & pt : pcl_input_cloud->points) {
-      for (const auto & aabb : aabbs) {
-        if(isPointInsideAABB(pt, pcl::PointXYZ(aabb.min.x, aabb.min.y, aabb.min.z), pcl::PointXYZ(aabb.max.x, aabb.max.y, aabb.max.z))) {
-          pcl_output_cloud->points.push_back(pt);
-          break;
+          if (std::isfinite(point[0]) && std::isfinite(point[1]) && std::isfinite(point[2])) {
+            pcl::PointXYZ pcl_point(point[0], point[1], point[2]);
+            extracted_cloud->points.push_back(pcl_point);
+          }
         }
       }
     }
-
-    sensor_msgs::msg::PointCloud2 output_cloud;
-    pcl::toROSMsg(*pcl_output_cloud, output_cloud);
-    output_cloud.header = input_cloud.header;
-    return output_cloud;
   }
+  extracted_cloud->width = extracted_cloud->points.size();
+  extracted_cloud->height = 1; // Unorganized point cloud
+  extracted_cloud->is_dense = false;
+  sensor_msgs::msg::PointCloud2 output_cloud;
+  pcl::toROSMsg(*extracted_cloud, output_cloud);
+  output_cloud.header.stamp = this->now();
+  output_cloud.header.frame_id = "camera_color_optical_frame";
+
+  RCLCPP_INFO(this->get_logger(), "Extracted %zu points from %zu bounding boxes",
+              extracted_cloud->points.size(), bboxes.size());
+
+  return output_cloud;
+}
 
 void PointCloudExtractor::cameraInfoCallback(
   const sensor_msgs::msg::CameraInfo::SharedPtr msg)

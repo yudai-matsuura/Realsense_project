@@ -23,6 +23,10 @@
 #include <librealsense2/rsutil.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
+#include <tf2_ros/transform_broadcaster.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_sensor_msgs/tf2_sensor_msgs.hpp>
+#include <tf2_ros/transform_listener.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -38,10 +42,9 @@ namespace lbr_pointcloud_extractor
   {
     float x, y, z;
   };
-  struct AABB
+  struct BBox2D
   {
-    Point3D min;
-    Point3D max;
+    int x_min, y_min, x_max, y_max;
   };
 
 class PointCloudExtractor : public rclcpp::Node
@@ -53,13 +56,6 @@ LBR_POINTCLOUD_EXTRACTOR_PUBLIC
   virtual ~PointCloudExtractor();
 
 private:
-    /**
-     * @brief
-     *
-     * @param msg
-     */
-    void pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
-
     /**
      * @brief
      *
@@ -84,37 +80,6 @@ private:
       const sensor_msgs::msg::Image & depth_img, int u, int v);
 
     /**
-     * @brief This function separate the bbox by 4 elements.
-     *
-     * @param bbox_msg
-     * @param depth_img
-     * @param intrinsics
-     */
-    std::vector<AABB> generateAABBs(
-      const std_msgs::msg::Float32MultiArray::SharedPtr bbox_msg,
-      const sensor_msgs::msg::Image & depth_img,
-      const rs2_intrinsics & intrinsics);
-
-    /**
-     * @brief This function check  if the point is inside the bounding box.
-     *
-     * @param pt, min_point, max_point
-     */
-    bool isPointInsideAABB(
-      const pcl::PointXYZ & pt,
-      const pcl::PointXYZ & min_point,
-      const pcl::PointXYZ & max_point);
-
-    /**
-     * @brief
-     *
-     * @param input_cloud, aabbs
-     */
-    sensor_msgs::msg::PointCloud2 filterPointCloudByAABBs(
-      const sensor_msgs::msg::PointCloud2 & input_cloud,
-      const std::vector<AABB> & aabbs);
-
-    /**
      * @brief
      *
      * @param msg
@@ -125,23 +90,21 @@ private:
     /**
      * @brief
      *
-     * @param aabbs, frame_id
+     * @param bboxes, depth_img
      */
-    void publishAABBMarker(
-      const std::vector<AABB> & aabbs,
-      const std::string & frame_id);
+    sensor_msgs::msg::PointCloud2 extractPointCloudFromBBoxes(
+      const std::vector<BBox2D> & bboxes,
+      const sensor_msgs::msg::Image & depth_img);
 
     /**
      * @brief
      *
-     * @param points_3d, frame_id
+     * @param bbox_msg
      */
-    void publishAABBCorners(
-      const std::vector<Point3D> & points_3d,
-      const std::string & frame_id);
+    std::vector<BBox2D> extractBBoxCoordinates(
+      const std_msgs::msg::Float32MultiArray::SharedPtr bbox_msg);
 
 // Subscriber
-rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_sub_;
 rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_image_sub_;
 rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr bbox_sub_;
 rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;
@@ -154,6 +117,8 @@ rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
 sensor_msgs::msg::PointCloud2::SharedPtr latest_pointcloud_;
 sensor_msgs::msg::Image::SharedPtr latest_depth_image_;
 rs2_intrinsics camera_intrinsics_;
+std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
 };
 
 }  // namespace lbr_pointcloud_extractor

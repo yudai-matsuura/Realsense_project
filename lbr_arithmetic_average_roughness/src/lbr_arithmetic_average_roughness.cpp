@@ -36,8 +36,8 @@ ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions
     std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
 
   // TF
-  tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+  // tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+  // tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 }
 
 ArithmeticAverageRoughness::~ArithmeticAverageRoughness()
@@ -50,19 +50,19 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
 
   // ****** Transform ****** //
   const std::string target_frame = "base_link";
-  const std::string source_frame = msg->header.frame_id;
-  geometry_msgs::msg::TransformStamped tf_msg_optical_to_base;
-  try{
-  tf_msg_optical_to_base = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(1000));
-  } catch (tf2::TransformException & ex) {
-    RCLCPP_WARN(this->get_logger(), "Could not transform point cloud from %s to %s: %s", source_frame.c_str(), target_frame.c_str(), ex.what());
-  }
-  sensor_msgs::msg::PointCloud2 transformed_cloud;
-  tf2::doTransform(*msg, transformed_cloud, tf_msg_optical_to_base);
+  // const std::string source_frame = msg->header.frame_id;
+  // geometry_msgs::msg::TransformStamped tf_msg_optical_to_base;
+  // try{
+  // tf_msg_optical_to_base = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(1000));
+  // } catch (tf2::TransformException & ex) {
+  //   RCLCPP_WARN(this->get_logger(), "Could not transform point cloud from %s to %s: %s", source_frame.c_str(), target_frame.c_str(), ex.what());
+  // }
+  // sensor_msgs::msg::PointCloud2 transformed_cloud;
+  // tf2::doTransform(*msg, transformed_cloud, tf_msg_optical_to_base);
 
   // ****** Convert Message Type ****** //
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(transformed_cloud, *cloud);
+  pcl::fromROSMsg(*msg, *cloud);
   if(cloud->empty()) return;
 
   // ****** Downsample ****** //
