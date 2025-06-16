@@ -55,13 +55,12 @@ PointCloudExtractor::~PointCloudExtractor()
 
 void PointCloudExtractor::depthImageCallback(const sensor_msgs::msg::Image::SharedPtr msg)
 {
-  std::cout << "depthImageCallback Successfully " << std::endl;
   latest_depth_image_ = msg;
 }
 
 void PointCloudExtractor::bboxCallback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
 {
-  std::cout << "bboxCallback Successfully " << std::endl;
+#if DEBUG_ENABLED
   if (!latest_depth_image_ || camera_intrinsics_.width == 0) {
     RCLCPP_WARN_THROTTLE(
       this->get_logger(), *this->get_clock(), 5000,
@@ -69,15 +68,14 @@ void PointCloudExtractor::bboxCallback(const std_msgs::msg::Float32MultiArray::S
     );
     return;
   }
+#endif //DEBUG_ENABLED
   if (!latest_depth_image_) return;
 
   // ****** Get BBox coordinate ****** //
   auto bboxes = extractBBoxCoordinates(msg);
-  std::cout << "get bbox coordinate Successfully " << std::endl;
 
   // ****** Extract point cloud ****** //
   auto extracted_cloud = extractPointCloudFromBBoxes(bboxes, *latest_depth_image_);
-  std::cout << "Extracted Successfully " << std::endl;
 
   // ****** Transform ****** //
   const std::string target_frame = "base_link";
@@ -87,11 +85,10 @@ void PointCloudExtractor::bboxCallback(const std_msgs::msg::Float32MultiArray::S
   tf_msg_optical_to_base = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(1000));
   } catch (tf2::TransformException & ex) {
     RCLCPP_WARN(this->get_logger(), "Could not transform point cloud from %s to %s: %s", source_frame.c_str(), target_frame.c_str(), ex.what());
+    return;
   }
   sensor_msgs::msg::PointCloud2 transformed_cloud;
   tf2::doTransform(extracted_cloud, transformed_cloud, tf_msg_optical_to_base);
-  std::cout << "Transformed Successfully " << std::endl;
-
 
   extracted_pointcloud_pub_->publish(transformed_cloud);
 }
