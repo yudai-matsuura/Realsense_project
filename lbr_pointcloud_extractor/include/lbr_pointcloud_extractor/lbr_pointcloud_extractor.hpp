@@ -57,30 +57,21 @@ LBR_POINTCLOUD_EXTRACTOR_PUBLIC
 
 private:
     /**
-     * @brief
+     * @brief This callback function runs when subscribes depth image topic.
      *
      * @param msg
      */
     void depthImageCallback(const sensor_msgs::msg::Image::SharedPtr msg);
 
     /**
-     * @brief
+     * @brief This callback function runs when subscribes bounding boxes topic.
      *
      * @param msg
      */
     void bboxCallback(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
 
     /**
-     * @brief This function get depth value at the pixel (u, v) from the depth image.
-     *
-     * @param depth_img
-     * @param u, v
-     */
-    float getDepthAtPixel(
-      const sensor_msgs::msg::Image & depth_img, int u, int v);
-
-    /**
-     * @brief
+     * @brief This function runs when subscribes camera info topic.
      *
      * @param msg
      */
@@ -88,7 +79,7 @@ private:
       const sensor_msgs::msg::CameraInfo::SharedPtr msg);
 
     /**
-     * @brief
+     * @brief This function extract the pointcloud inside the bounding boxes
      *
      * @param bboxes, depth_img
      */
@@ -97,7 +88,7 @@ private:
       const sensor_msgs::msg::Image & depth_img);
 
     /**
-     * @brief
+     * @brief This function extracts the bounding box coordinate from bbox_msg
      *
      * @param bbox_msg
      */
@@ -111,7 +102,6 @@ rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;
 
 // Publisher
 rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr extracted_pointcloud_pub_;
-rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
 
 // Variables
 sensor_msgs::msg::PointCloud2::SharedPtr latest_pointcloud_;

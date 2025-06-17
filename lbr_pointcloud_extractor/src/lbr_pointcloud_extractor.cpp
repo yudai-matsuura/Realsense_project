@@ -26,10 +26,9 @@ PointCloudExtractor::PointCloudExtractor(const rclcpp::NodeOptions & options)
   std::cout << "PointCloudExtractor class is established." << std::endl;
   // Publisher
   extracted_pointcloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-    "/pointcloud_inside_bounding_box", 10);
+    "/extracted_pointcloud", 10);
 
   // Subscriber
-
   depth_image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
     "/camera/camera/aligned_depth_to_color/image_raw", rclcpp::SensorDataQoS(),
     std::bind(&PointCloudExtractor::depthImageCallback, this, std::placeholders::_1));
@@ -71,7 +70,7 @@ void PointCloudExtractor::bboxCallback(const std_msgs::msg::Float32MultiArray::S
 #endif //DEBUG_ENABLED
   if (!latest_depth_image_) return;
 
-  // ****** Get BBox coordinate ****** //
+  // ****** Get BBox's vertex coordinate ****** //
   auto bboxes = extractBBoxCoordinates(msg);
 
   // ****** Extract point cloud ****** //
@@ -91,32 +90,6 @@ void PointCloudExtractor::bboxCallback(const std_msgs::msg::Float32MultiArray::S
   tf2::doTransform(extracted_cloud, transformed_cloud, tf_msg_optical_to_base);
 
   extracted_pointcloud_pub_->publish(transformed_cloud);
-}
-
-// HACK: We should use "align_depth.enable" when launch
-float PointCloudExtractor::getDepthAtPixel(const sensor_msgs::msg::Image & depth_img, int u, int v)
-{
-  if (depth_img.encoding != sensor_msgs::image_encodings::TYPE_16UC1) {
-    RCLCPP_WARN(this->get_logger(), "Depth image encoding is not 16UC1");
-    return 0.0f;
-  }
-  if (u < 0 || u >= static_cast<int>(depth_img.width) || v < 0 || v >= static_cast<int>(depth_img.height)) {
-    return 0.0f;
-  }
-  try {
-    // Convert ROS2 image to OpenCV Mat
-    cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvShare(std::make_shared<sensor_msgs::msg::Image>(depth_img), depth_img.encoding);
-    const cv::Mat & depth_image = cv_ptr->image;
-    uint16_t depth_mm = depth_image.at<uint16_t>(v, u);
-    if (depth_mm == 0) {
-      return 0.0f; // No depth information
-    }
-    float depth_m = static_cast<float>(depth_mm) * 0.001f; // Convert [mm] to [m]
-    return depth_m;
-  } catch (const std::exception & e) {
-    RCLCPP_ERROR(this->get_logger(), "Exception in getDepthAtPixel: %s", e.what());
-    return 0.0f;
-  }
 }
 
 std::vector<BBox2D> PointCloudExtractor::extractBBoxCoordinates(
@@ -164,8 +137,7 @@ sensor_msgs::msg::PointCloud2 PointCloudExtractor::extractPointCloudFromBBoxes(
   for (const auto bbox : bboxes) {
     for (int v = bbox.y_min; v <= bbox.y_max; ++v) {
       for (int u = bbox.x_min; u <= bbox.x_max; ++u) {
-        // Use the pre-converted cv::Mat directly for high efficiency
-        uint16_t depth_mm = depth_image_mat.at<uint16_t>(v, u);
+        uint16_t depth_mm = depth_image_mat.at<uint16_t>(v, u); // get depth
         if (depth_mm == 0) {
             continue; // No depth information
         }
@@ -210,7 +182,6 @@ void PointCloudExtractor::cameraInfoCallback(
     camera_intrinsics_.model = RS2_DISTORTION_NONE;
     std::copy(std::begin(msg->d), std::begin(msg->d) + 5, camera_intrinsics_.coeffs);
   }
-
 
 }  // namespace lbr_pointcloud_extractor
 

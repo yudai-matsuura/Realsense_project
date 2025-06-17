@@ -32,7 +32,7 @@ ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions
   //   std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
 
   point_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    "/pointcloud_inside_bounding_box", rclcpp::SensorDataQoS(),
+    "/extracted_pointcloud", rclcpp::SensorDataQoS(),
     std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
 }
 
@@ -42,8 +42,8 @@ ArithmeticAverageRoughness::~ArithmeticAverageRoughness()
 }
 
 
-void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg){
-
+void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+{
   // ****** Convert Message Type ****** //
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*msg, *cloud);
