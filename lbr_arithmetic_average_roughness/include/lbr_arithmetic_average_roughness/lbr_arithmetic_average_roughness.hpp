@@ -82,6 +82,13 @@ private:
   void publishPlaneMarker(const Eigen::Vector4f& centroid, const Eigen::Vector3f& normal, const std::string & frame_id);
 
   /**
+   * @brief This function visualize centroid point
+   *
+   * @param centroid, frame_id
+   */
+  void publishCentroidMarker(const Eigen::Vector4f& centroid, const std::string & frame_id);
+
+  /**
    * @brief This function calculate the avarage height from the estimated plane.
    *
    * @param cloud, centroid, normal
@@ -118,7 +125,8 @@ private:
 // Publisher
 rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
 // Subscriber
-rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_sub_;
+rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr extracted_pointcloud_sub_;
+rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_raw_sub_;
 };
 
 }  // namespace lbr_arithmetic_average_roughness
