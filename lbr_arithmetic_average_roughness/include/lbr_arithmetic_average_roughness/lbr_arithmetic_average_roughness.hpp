@@ -22,10 +22,6 @@
 #include <string>
 #include <vector>
 #include <Eigen/Dense>
-#include <tf2_ros/transform_broadcaster.h>
-#include <tf2_ros/buffer.h>
-#include <tf2_sensor_msgs/tf2_sensor_msgs.hpp>
-#include <tf2_ros/transform_listener.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/common/centroid.h>
@@ -86,6 +82,13 @@ private:
   void publishPlaneMarker(const Eigen::Vector4f& centroid, const Eigen::Vector3f& normal, const std::string & frame_id);
 
   /**
+   * @brief This function visualize centroid point
+   *
+   * @param centroid, frame_id
+   */
+  void publishCentroidMarker(const Eigen::Vector4f& centroid, const std::string & frame_id);
+
+  /**
    * @brief This function calculate the avarage height from the estimated plane.
    *
    * @param cloud, centroid, normal
@@ -122,11 +125,8 @@ private:
 // Publisher
 rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
 // Subscriber
-rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_sub_;
-
-// Variables
-std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
-std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
+rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr extracted_pointcloud_sub_;
+rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_raw_sub_;
 };
 
 }  // namespace lbr_arithmetic_average_roughness
