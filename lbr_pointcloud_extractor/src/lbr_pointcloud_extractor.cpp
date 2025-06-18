@@ -19,6 +19,11 @@
 #define DEBUG_ENABLED false
 namespace lbr_pointcloud_extractor
 {
+// Indices for the intrinsic camera matrix K
+constexpr int K_fx = 0;
+constexpr int K_cx = 2;
+constexpr int K_fy = 4;
+constexpr int K_cy = 5;
 
 PointCloudExtractor::PointCloudExtractor(const rclcpp::NodeOptions & options)
 : rclcpp::Node("lbr_pointcloud_extractor", options)
@@ -172,16 +177,16 @@ sensor_msgs::msg::PointCloud2 PointCloudExtractor::extractPointCloudFromBBoxes(
 
 void PointCloudExtractor::cameraInfoCallback(
   const sensor_msgs::msg::CameraInfo::SharedPtr msg)
-  {
-    camera_intrinsics_.width = msg->width;
-    camera_intrinsics_.height = msg->height;
-    camera_intrinsics_.ppx = msg->k[2];
-    camera_intrinsics_.ppy = msg->k[5];
-    camera_intrinsics_.fx = msg->k[0];
-    camera_intrinsics_.fy = msg->k[4];
-    camera_intrinsics_.model = RS2_DISTORTION_NONE;
-    std::copy(std::begin(msg->d), std::begin(msg->d) + 5, camera_intrinsics_.coeffs);
-  }
+{
+  camera_intrinsics_.width = msg->width;
+  camera_intrinsics_.height = msg->height;
+  camera_intrinsics_.ppx = msg->k[K_cx];
+  camera_intrinsics_.ppy = msg->k[K_cy];
+  camera_intrinsics_.fx = msg->k[K_fx];
+  camera_intrinsics_.fy = msg->k[K_fy];
+  camera_intrinsics_.model = RS2_DISTORTION_NONE;
+  std::copy(std::begin(msg->d), std::begin(msg->d) + 5, camera_intrinsics_.coeffs);
+}
 
 }  // namespace lbr_pointcloud_extractor
 
