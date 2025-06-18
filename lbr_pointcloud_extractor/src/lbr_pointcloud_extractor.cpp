@@ -19,6 +19,11 @@
 #define DEBUG_ENABLED false
 namespace lbr_pointcloud_extractor
 {
+constexpr size_t kBBoxElementNum = 4; // x_min, y_min, x_max, y_max
+constexpr int x_min_index = 0;
+constexpr int y_min_index = 1;
+constexpr int x_max_index = 2;
+constexpr int y_max_index = 3;
 // Indices for the intrinsic camera matrix K
 constexpr int K_fx = 0;
 constexpr int K_cx = 2;
@@ -103,12 +108,12 @@ std::vector<BBox2D> PointCloudExtractor::extractBBoxCoordinates(
   std::vector<BBox2D> bboxes;
   const auto & data = bbox_msg->data;
 
-  for (size_t i = 0; i + 3 < data.size(); i += 4) {
+  for (size_t i = 0; i + (kBBoxElementNum - 1) < data.size(); i += kBBoxElementNum) {
     BBox2D bbox;
-    bbox.x_min = static_cast<int>(std::max(0.0f, data[i]));
-    bbox.y_min = static_cast<int>(std::max(0.0f, data[i + 1]));
-    bbox.x_max = static_cast<int>(data[i + 2]);
-    bbox.y_max = static_cast<int>(data[i + 3]);
+    bbox.x_min = static_cast<int>(std::max(0.0f, data[i + x_min_index]));
+    bbox.y_min = static_cast<int>(std::max(0.0f, data[i + y_min_index]));
+    bbox.x_max = static_cast<int>(data[i + x_max_index]);
+    bbox.y_max = static_cast<int>(data[i + y_max_index]);
 
     if (latest_depth_image_) {
       bbox.x_max = std::min(bbox.x_max, static_cast<int>(latest_depth_image_->width - 1));
