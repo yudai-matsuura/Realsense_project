@@ -9,12 +9,6 @@ endif()
 find_package(ament_cmake_auto REQUIRED)
 find_package(realsense2 REQUIRED)
 find_package(OpenCV REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(tf2 REQUIRED)
-find_package(tf2_ros REQUIRED)
-find_package(tf2_geometry_msgs REQUIRED)
-find_package(tf2_sensor_msgs REQUIRED)
-
 ament_auto_find_build_dependencies()
 
 ament_auto_add_library(lbr_pointcloud_extractor src/lbr_pointcloud_extractor.cpp)

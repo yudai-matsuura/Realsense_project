@@ -21,7 +21,7 @@ namespace lbr_arithmetic_average_roughness
 {
 constexpr float kVoxelSize = 0.01f; //[m]
 constexpr int kMeanK = 50; // Number of nearest neighbors to analyze
-constexpr float kStddevMulThresh = 1.0f; // Standard deviation multiplier threshold
+constexpr float kStddevMulThresh = 1.5f; // Standard deviation multiplier threshold
 
 ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions & options)
 : rclcpp::Node("lbr_arithmetic_average_roughness", options)

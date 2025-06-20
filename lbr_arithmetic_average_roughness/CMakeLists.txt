@@ -8,7 +8,6 @@ endif()
 # find dependencies
 find_package(ament_cmake_auto REQUIRED)
 find_package(PCL REQUIRED COMPONENTS filters features)
-
 ament_auto_find_build_dependencies()
 
 ament_auto_add_library(lbr_arithmetic_average_roughness src/lbr_arithmetic_average_roughness.cpp)
