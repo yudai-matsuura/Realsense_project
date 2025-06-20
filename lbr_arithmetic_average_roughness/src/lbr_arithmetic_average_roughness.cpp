@@ -21,11 +21,7 @@ namespace lbr_arithmetic_average_roughness
 {
 constexpr float kVoxelSize = 0.01f; //[m]
 constexpr int kMeanK = 50; // Number of nearest neighbors to analyze
-constexpr float kStddevMulThresh = 0.5f; // Standard deviation multiplier threshold
-constexpr float kDistanceThreshold = 0.2f; //[m]
-constexpr float kMaximumRoughness = 0.05f;
-constexpr float kPlaneSize = 0.7f;
-constexpr int kPrintInterval = 10;
+constexpr float kStddevMulThresh = 1.5f; // Standard deviation multiplier threshold
 
 ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions & options)
 : rclcpp::Node("lbr_arithmetic_average_roughness", options)
@@ -43,6 +39,10 @@ ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions
     "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
     std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
 #endif // DEBUG_ENABLED
+
+  // TF
+  tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 }
 
 ArithmeticAverageRoughness::~ArithmeticAverageRoughness()
@@ -53,9 +53,22 @@ ArithmeticAverageRoughness::~ArithmeticAverageRoughness()
 
 void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
+  // ****** Transform ****** //
+  const std::string target_frame = "base_link";
+  const std::string source_frame = "camera_color_optical_frame";
+  geometry_msgs::msg::TransformStamped tf_msg_optical_to_base;
+  try{
+  tf_msg_optical_to_base = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(100));
+  } catch (tf2::TransformException & ex) {
+    RCLCPP_WARN(this->get_logger(), "Could not transform point cloud from %s to %s: %s", source_frame.c_str(), target_frame.c_str(), ex.what());
+    return;
+  }
+  sensor_msgs::msg::PointCloud2 transformed_cloud;
+  tf2::doTransform(*msg, transformed_cloud, tf_msg_optical_to_base);
+
   // ****** Convert Message Type ****** //
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*msg, *cloud);
+  pcl::fromROSMsg(transformed_cloud, *cloud);
   if(cloud->empty()) return;
 
   // ****** Filtering ****** //
@@ -94,13 +107,13 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   // ****** Roughness Score ****** //
   static int counter = 0;
   float roughness_score = computeRoughnessScore(inlier_distances);
+  const int kPrintInterval = 10;
   if (counter % kPrintInterval == 0) {
     std::cout << "Roughness score:" << roughness_score << std::endl;
   }
   counter++;
 
   // ****** Visualize ****** //
-  const std::string target_frame = "base_link";
   publishPlaneMarker(centroid, normal, target_frame);
   #if DEBUG_ENABLED
   publishCentroidMarker(centroid, target_frame);
@@ -175,6 +188,8 @@ void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f & cent
   plane_marker.color.b = 0.0f;
   plane_marker.color.a = 0.3f;
 
+  const float kPlaneSize = 0.7f;
+
   // Create a point on a plane by generating two vectors perpendicular to the normal
   Eigen::Vector3f basis1, basis2;
   basis1 = normal.unitOrthogonal();
@@ -195,6 +210,7 @@ void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f & cent
   p2.x = corners[2].x(); p2.y = corners[2].y(); p2.z = corners[2].z();
   p3.x = corners[3].x(); p3.y = corners[3].y(); p3.z = corners[3].z();
 
+  // Both side of the plane
   plane_marker.points.push_back(p0); plane_marker.points.push_back(p1); plane_marker.points.push_back(p2);
   plane_marker.points.push_back(p2); plane_marker.points.push_back(p3); plane_marker.points.push_back(p0);
   plane_marker.points.push_back(p2); plane_marker.points.push_back(p1); plane_marker.points.push_back(p0);
@@ -253,6 +269,7 @@ std::vector<int> ArithmeticAverageRoughness::getInlierIndicesByDistance(
   const std::vector<float> & distances)
 {
   std::vector<int> indices;
+  const float kDistanceThreshold = 0.2f; //[m]
   for (size_t i = 0; i < distances.size(); ++i) {
     if (distances[i] < kDistanceThreshold) {
       indices.push_back(i);
@@ -309,7 +326,8 @@ void ArithmeticAverageRoughness::publishRoughnessHeatMap(
   marker_pub_->publish(heatmap_marker);
 }
 
-float ArithmeticAverageRoughness::computeRoughnessScore(const std::vector<float> & distances){
+float ArithmeticAverageRoughness::computeRoughnessScore(const std::vector<float> & distances)
+{
   float sq_sum = 0.0f;
   float kMaximumRoughness = 0.05f; // Maximum roughness threshold in meters
   size_t filtered_pointcloud_number = distances.size();

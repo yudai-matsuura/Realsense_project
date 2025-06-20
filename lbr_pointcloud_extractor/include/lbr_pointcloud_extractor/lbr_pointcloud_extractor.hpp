@@ -23,10 +23,6 @@
 #include <librealsense2/rsutil.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
-#include <tf2_ros/transform_broadcaster.h>
-#include <tf2_ros/buffer.h>
-#include <tf2_sensor_msgs/tf2_sensor_msgs.hpp>
-#include <tf2_ros/transform_listener.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -107,8 +103,6 @@ rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr extracted_pointcloud
 sensor_msgs::msg::PointCloud2::SharedPtr latest_pointcloud_;
 sensor_msgs::msg::Image::SharedPtr latest_depth_image_;
 rs2_intrinsics camera_intrinsics_;
-std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
-std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
 };
 
 }  // namespace lbr_pointcloud_extractor

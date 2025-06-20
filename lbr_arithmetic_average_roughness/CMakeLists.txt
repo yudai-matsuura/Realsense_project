@@ -7,14 +7,7 @@ endif()
 
 # find dependencies
 find_package(ament_cmake_auto REQUIRED)
-find_package(visualization_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
 find_package(PCL REQUIRED COMPONENTS filters features)
-find_package(tf2 REQUIRED)
-find_package(tf2_ros REQUIRED)
-find_package(tf2_geometry_msgs REQUIRED)
-find_package(tf2_sensor_msgs REQUIRED)
-
 ament_auto_find_build_dependencies()
 
 ament_auto_add_library(lbr_arithmetic_average_roughness src/lbr_arithmetic_average_roughness.cpp)

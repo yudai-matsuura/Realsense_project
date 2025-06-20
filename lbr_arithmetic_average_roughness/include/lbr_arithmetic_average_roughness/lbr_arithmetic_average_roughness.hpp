@@ -29,6 +29,10 @@
 #include <pcl/filters/filter.h>
 #include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/filters/voxel_grid.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_sensor_msgs/tf2_sensor_msgs.hpp>
+#include <tf2_ros/transform_listener.h>
 #include <visualization_msgs/msg/marker.hpp>
 #include <geometry_msgs/msg/point.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
@@ -127,6 +131,9 @@ rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
 // Subscriber
 rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr extracted_pointcloud_sub_;
 rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_raw_sub_;
+// Variables
+std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
 };
 
 }  // namespace lbr_arithmetic_average_roughness
