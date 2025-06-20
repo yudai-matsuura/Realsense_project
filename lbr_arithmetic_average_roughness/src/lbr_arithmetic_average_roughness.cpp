@@ -23,7 +23,6 @@ constexpr float kVoxelSize = 0.01f; //[m]
 constexpr int kMeanK = 50; // Number of nearest neighbors to analyze
 constexpr float kStddevMulThresh = 0.5f; // Standard deviation multiplier threshold
 constexpr float kDistanceThreshold = 0.2f; //[m]
-constexpr float kMaximumRoughness = 0.05f;
 constexpr float kPlaneSize = 0.7f;
 constexpr int kPrintInterval = 10;
 
@@ -38,11 +37,15 @@ ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions
     "/extracted_pointcloud", rclcpp::SensorDataQoS(),
     std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
 
-#if DEBUG_ENABLED
+#if 1
   pointcloud_raw_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
     std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
 #endif // DEBUG_ENABLED
+  // TF
+  tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+
 }
 
 ArithmeticAverageRoughness::~ArithmeticAverageRoughness()
@@ -53,9 +56,22 @@ ArithmeticAverageRoughness::~ArithmeticAverageRoughness()
 
 void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
+  // ****** Transform ****** //
+  const std::string target_frame = "base_link";
+  const std::string source_frame = "camera_color_optical_frame";
+  geometry_msgs::msg::TransformStamped tf_msg_optical_to_base;
+  try{
+  tf_msg_optical_to_base = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(100));
+  } catch (tf2::TransformException & ex) {
+    RCLCPP_WARN(this->get_logger(), "Could not transform point cloud from %s to %s: %s", source_frame.c_str(), target_frame.c_str(), ex.what());
+    return;
+  }
+  sensor_msgs::msg::PointCloud2 transformed_cloud;
+  tf2::doTransform(*msg, transformed_cloud, tf_msg_optical_to_base);
+
   // ****** Convert Message Type ****** //
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*msg, *cloud);
+  pcl::fromROSMsg(transformed_cloud, *cloud);
   if(cloud->empty()) return;
 
   // ****** Filtering ****** //
@@ -100,7 +116,6 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   counter++;
 
   // ****** Visualize ****** //
-  const std::string target_frame = "base_link";
   publishPlaneMarker(centroid, normal, target_frame);
   #if DEBUG_ENABLED
   publishCentroidMarker(centroid, target_frame);

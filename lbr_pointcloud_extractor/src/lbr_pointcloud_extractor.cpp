@@ -50,10 +50,6 @@ PointCloudExtractor::PointCloudExtractor(const rclcpp::NodeOptions & options)
   camera_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
     "/camera/camera/aligned_depth_to_color/camera_info", rclcpp::SensorDataQoS(),
     std::bind(&PointCloudExtractor::cameraInfoCallback, this, std::placeholders::_1));
-
-  // TF
-  tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 }
 
 PointCloudExtractor::~PointCloudExtractor()
@@ -86,20 +82,7 @@ void PointCloudExtractor::bboxCallback(const std_msgs::msg::Float32MultiArray::S
   // ****** Extract point cloud ****** //
   auto extracted_cloud = extractPointCloudFromBBoxes(bboxes, *latest_depth_image_);
 
-  // ****** Transform ****** //
-  const std::string target_frame = "base_link";
-  const std::string source_frame = "camera_color_optical_frame";
-  geometry_msgs::msg::TransformStamped tf_msg_optical_to_base;
-  try{
-  tf_msg_optical_to_base = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(100));
-  } catch (tf2::TransformException & ex) {
-    RCLCPP_WARN(this->get_logger(), "Could not transform point cloud from %s to %s: %s", source_frame.c_str(), target_frame.c_str(), ex.what());
-    return;
-  }
-  sensor_msgs::msg::PointCloud2 transformed_cloud;
-  tf2::doTransform(extracted_cloud, transformed_cloud, tf_msg_optical_to_base);
-
-  extracted_pointcloud_pub_->publish(transformed_cloud);
+  extracted_pointcloud_pub_->publish(extracted_cloud);
 }
 
 std::vector<BBox2D> PointCloudExtractor::extractBBoxCoordinates(
