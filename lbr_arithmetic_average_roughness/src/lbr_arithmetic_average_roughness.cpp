@@ -37,11 +37,12 @@ ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions
     "/extracted_pointcloud", rclcpp::SensorDataQoS(),
     std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
 
-#if 1
+#if DEBUG_ENABLED
   pointcloud_raw_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
     std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
 #endif // DEBUG_ENABLED
+
   // TF
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
