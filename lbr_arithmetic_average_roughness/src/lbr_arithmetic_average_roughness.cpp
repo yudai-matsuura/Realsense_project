@@ -22,9 +22,6 @@ namespace lbr_arithmetic_average_roughness
 constexpr float kVoxelSize = 0.01f; //[m]
 constexpr int kMeanK = 50; // Number of nearest neighbors to analyze
 constexpr float kStddevMulThresh = 1.0f; // Standard deviation multiplier threshold
-constexpr float kDistanceThreshold = 0.2f; //[m]
-constexpr float kPlaneSize = 0.7f;
-constexpr int kPrintInterval = 10;
 
 ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions & options)
 : rclcpp::Node("lbr_arithmetic_average_roughness", options)
@@ -46,7 +43,6 @@ ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions
   // TF
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
-
 }
 
 ArithmeticAverageRoughness::~ArithmeticAverageRoughness()
@@ -111,6 +107,7 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   // ****** Roughness Score ****** //
   static int counter = 0;
   float roughness_score = computeRoughnessScore(inlier_distances);
+  const int kPrintInterval = 10;
   if (counter % kPrintInterval == 0) {
     std::cout << "Roughness score:" << roughness_score << std::endl;
   }
@@ -191,6 +188,8 @@ void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f & cent
   plane_marker.color.b = 0.0f;
   plane_marker.color.a = 0.3f;
 
+  const float kPlaneSize = 0.7f;
+
   // Create a point on a plane by generating two vectors perpendicular to the normal
   Eigen::Vector3f basis1, basis2;
   basis1 = normal.unitOrthogonal();
@@ -211,6 +210,7 @@ void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f & cent
   p2.x = corners[2].x(); p2.y = corners[2].y(); p2.z = corners[2].z();
   p3.x = corners[3].x(); p3.y = corners[3].y(); p3.z = corners[3].z();
 
+  // Both side of the plane
   plane_marker.points.push_back(p0); plane_marker.points.push_back(p1); plane_marker.points.push_back(p2);
   plane_marker.points.push_back(p2); plane_marker.points.push_back(p3); plane_marker.points.push_back(p0);
   plane_marker.points.push_back(p2); plane_marker.points.push_back(p1); plane_marker.points.push_back(p0);
@@ -269,6 +269,7 @@ std::vector<int> ArithmeticAverageRoughness::getInlierIndicesByDistance(
   const std::vector<float> & distances)
 {
   std::vector<int> indices;
+  const float kDistanceThreshold = 0.2f; //[m]
   for (size_t i = 0; i < distances.size(); ++i) {
     if (distances[i] < kDistanceThreshold) {
       indices.push_back(i);
@@ -325,7 +326,8 @@ void ArithmeticAverageRoughness::publishRoughnessHeatMap(
   marker_pub_->publish(heatmap_marker);
 }
 
-float ArithmeticAverageRoughness::computeRoughnessScore(const std::vector<float> & distances){
+float ArithmeticAverageRoughness::computeRoughnessScore(const std::vector<float> & distances)
+{
   float sq_sum = 0.0f;
   float kMaximumRoughness = 0.05f; // Maximum roughness threshold in meters
   size_t filtered_pointcloud_number = distances.size();
