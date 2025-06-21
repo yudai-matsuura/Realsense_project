@@ -63,6 +63,16 @@ private:
     const sensor_msgs::msg::PointCloud2::SharedPtr msg);
 
   /**
+   * @brief This function transform pointcloud.
+   *
+   * @param input_cloud,source_frame, target_frame
+   */
+  sensor_msgs::msg::PointCloud2::SharedPtr transformPointCloud(
+    const sensor_msgs::msg::PointCloud2::SharedPtr & input_cloud,
+    const std::string & source_frame,
+    const std::string & target_frame);
+
+  /**
    * @brief This function filters the point cloud using a voxel grid filter.
    *
    * @param cloud

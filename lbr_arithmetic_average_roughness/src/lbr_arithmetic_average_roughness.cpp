@@ -64,19 +64,11 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   // ****** Transform ****** //
   const std::string target_frame = "base_link";
   const std::string source_frame = "camera_color_optical_frame";
-  geometry_msgs::msg::TransformStamped tf_msg_optical_to_base;
-  try{
-  tf_msg_optical_to_base = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(100));
-  } catch (tf2::TransformException & ex) {
-    RCLCPP_WARN(this->get_logger(), "Could not transform point cloud from %s to %s: %s", source_frame.c_str(), target_frame.c_str(), ex.what());
-    return;
-  }
-  sensor_msgs::msg::PointCloud2 transformed_cloud;
-  tf2::doTransform(*msg, transformed_cloud, tf_msg_optical_to_base);
+  auto transformed_cloud = transformPointCloud(msg, target_frame, source_frame);
 
   // ****** Convert Message Type ****** //
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(transformed_cloud, *cloud);
+  pcl::fromROSMsg(*transformed_cloud, *cloud);
   if(cloud->empty()) return;
 
   // ****** Filtering ****** //
@@ -135,19 +127,11 @@ void ArithmeticAverageRoughness::slopePointCloudCallback(const sensor_msgs::msg:
   // ****** Transform ****** //
   const std::string target_frame = "world_frame";
   const std::string source_frame = "camera_color_optical_frame";
-  geometry_msgs::msg::TransformStamped tf_msg_optical_to_world;
-  try{
-  tf_msg_optical_to_world = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(100));
-  } catch (tf2::TransformException & ex) {
-    RCLCPP_WARN(this->get_logger(), "Could not transform point cloud from %s to %s: %s", source_frame.c_str(), target_frame.c_str(), ex.what());
-    return;
-  }
-  sensor_msgs::msg::PointCloud2 transformed_cloud;
-  tf2::doTransform(*msg, transformed_cloud, tf_msg_optical_to_world);
+  auto transformed_cloud = transformPointCloud(msg, target_frame, source_frame);
 
   // ****** Convert Message Type ****** //
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(transformed_cloud, *cloud);
+  pcl::fromROSMsg(*transformed_cloud, *cloud);
   if(cloud->empty()) return;
 
   // ****** Filtering ****** //
@@ -172,6 +156,22 @@ void ArithmeticAverageRoughness::slopePointCloudCallback(const sensor_msgs::msg:
   // ****** Compute Angle ****** //
   float angle = computeAngle(normal);
   RCLCPP_INFO(this->get_logger(), "Inclination angle [deg]: %.2f", angle);
+}
+
+sensor_msgs::msg::PointCloud2::SharedPtr ArithmeticAverageRoughness::transformPointCloud(
+  const sensor_msgs::msg::PointCloud2::SharedPtr & input_cloud,
+  const std::string & target_frame, const std::string & source_frame)
+{
+  geometry_msgs::msg::TransformStamped tf_msg;
+  try{
+    tf_msg = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(100));
+    } catch (tf2::TransformException & ex) {
+      RCLCPP_WARN(this->get_logger(), "Could not transform point cloud from %s to %s: %s", source_frame.c_str(), target_frame.c_str(), ex.what());
+      return nullptr;
+    }
+    auto transformed = std::make_shared<sensor_msgs::msg::PointCloud2>();
+    tf2::doTransform(*input_cloud, *transformed, tf_msg);
+    return transformed;
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
