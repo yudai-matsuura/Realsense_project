@@ -65,11 +65,24 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   const std::string target_frame = "base_link";
   const std::string source_frame = "camera_color_optical_frame";
   auto filtered_cloud = preProcessingPointCloud(msg, target_frame, source_frame);
+  if(!filtered_cloud) {
+    RCLCPP_WARN(this->get_logger(), "Preprocessing returned a null point cloud. Skipping further processing.");
+    return;
+  }
+  if(filtered_cloud->empty()) {
+    RCLCPP_DEBUG(this->get_logger(), "Filtered point cloud is empty. Skipping further processing.");
+    return;
+  }
 
   // ****** Estimate Plane ****** //
   Eigen::Vector4f centroid;
   Eigen::Vector3f normal;
-  estimateRegressionPlane(filtered_cloud, centroid, normal);
+  try{
+    estimateRegressionPlane(filtered_cloud, centroid, normal);
+    } catch (const std::runtime_error & e) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to estimate regression plane: %s", e.what());
+      return;
+    }
 
   // ****** Compute Distances ****** //
   std::vector<float> distances = computePointToPlaneDistance(filtered_cloud, centroid, normal);
@@ -112,11 +125,24 @@ void ArithmeticAverageRoughness::slopePointCloudCallback(const sensor_msgs::msg:
   const std::string target_frame = "world_frame";
   const std::string source_frame = "camera_color_optical_frame";
   auto filtered_cloud = preProcessingPointCloud(msg, target_frame, source_frame);
+  if(!filtered_cloud) {
+    RCLCPP_WARN(this->get_logger(), "Preprocessing returned a null point cloud. Skipping further processing.");
+    return;
+  }
+  if(filtered_cloud->empty()) {
+    RCLCPP_DEBUG(this->get_logger(), "Filtered point cloud is empty. Skipping further processing.");
+    return;
+  }
 
   // ****** Estimate Plane ****** //
   Eigen::Vector4f centroid;
   Eigen::Vector3f normal;
+  try{
   estimateRegressionPlane(filtered_cloud, centroid, normal);
+  } catch (const std::runtime_error & e) {
+    RCLCPP_ERROR(this->get_logger(), "Failed to estimate regression plane: %s", e.what());
+    return;
+  }
 
   // ****** Publish Local Normal Marker ****** //
   publishNormalVectorMarker(
