@@ -61,25 +61,10 @@ ArithmeticAverageRoughness::~ArithmeticAverageRoughness()
 
 void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
-  // ****** Transform ****** //
+  // ****** Preprocessing ****** //
   const std::string target_frame = "base_link";
   const std::string source_frame = "camera_color_optical_frame";
-  auto transformed_cloud = transformPointCloud(msg, target_frame, source_frame);
-
-  // ****** Convert Message Type ****** //
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*transformed_cloud, *cloud);
-  if(cloud->empty()) return;
-
-  // ****** Filtering ****** //
-  pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled_cloud = downsamplePointCloud(cloud);
-  if(downsampled_cloud->empty()) return;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr nan_removed_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  std::vector<int> indices;
-  pcl::removeNaNFromPointCloud(*downsampled_cloud, *nan_removed_cloud, indices);
-  if(nan_removed_cloud->empty()) return;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud = removeOutlierFromPointCloud(nan_removed_cloud);
-  if(filtered_cloud->empty()) return;
+  auto filtered_cloud = preProcessingPointCloud(msg, target_frame, source_frame);
 
   // ****** Estimate Plane ****** //
   Eigen::Vector4f centroid;
@@ -123,26 +108,10 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
 
 void ArithmeticAverageRoughness::slopePointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
-  // TODO: Consolidating common processes
-  // ****** Transform ****** //
+  // ****** Preprocessing ****** //
   const std::string target_frame = "world_frame";
   const std::string source_frame = "camera_color_optical_frame";
-  auto transformed_cloud = transformPointCloud(msg, target_frame, source_frame);
-
-  // ****** Convert Message Type ****** //
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*transformed_cloud, *cloud);
-  if(cloud->empty()) return;
-
-  // ****** Filtering ****** //
-  pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled_cloud = downsamplePointCloud(cloud);
-  if(downsampled_cloud->empty()) return;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr nan_removed_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  std::vector<int> indices;
-  pcl::removeNaNFromPointCloud(*downsampled_cloud, *nan_removed_cloud, indices);
-  if(nan_removed_cloud->empty()) return;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud = removeOutlierFromPointCloud(nan_removed_cloud);
-  if(filtered_cloud->empty()) return;
+  auto filtered_cloud = preProcessingPointCloud(msg, target_frame, source_frame);
 
   // ****** Estimate Plane ****** //
   Eigen::Vector4f centroid;
@@ -156,6 +125,33 @@ void ArithmeticAverageRoughness::slopePointCloudCallback(const sensor_msgs::msg:
   // ****** Compute Angle ****** //
   float angle = computeAngle(normal);
   RCLCPP_INFO(this->get_logger(), "Inclination angle [deg]: %.2f", angle);
+}
+
+pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::preProcessingPointCloud(
+  const sensor_msgs::msg::PointCloud2::SharedPtr & input_cloud,
+  const std::string & target_frame,
+  const std::string & source_frame)
+{
+  // ****** Transform ****** //
+  auto transformed_cloud = transformPointCloud(input_cloud, target_frame, source_frame);
+  if (!transformed_cloud) return nullptr;
+
+  // ****** Convert Message Type ****** //
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::fromROSMsg(*transformed_cloud, *cloud);
+  if(cloud->empty()) return nullptr;
+
+  // ****** Filtering ****** //
+  pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled_cloud = downsamplePointCloud(cloud);
+  if(downsampled_cloud->empty()) return nullptr;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr nan_removed_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  std::vector<int> indices;
+  pcl::removeNaNFromPointCloud(*downsampled_cloud, *nan_removed_cloud, indices);
+  if(nan_removed_cloud->empty()) return nullptr;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud = removeOutlierFromPointCloud(nan_removed_cloud);
+  if(filtered_cloud->empty()) return nullptr;
+
+  return filtered_cloud;
 }
 
 sensor_msgs::msg::PointCloud2::SharedPtr ArithmeticAverageRoughness::transformPointCloud(
@@ -240,14 +236,11 @@ void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f & cent
   plane_marker.color.g = 1.0f;
   plane_marker.color.b = 0.0f;
   plane_marker.color.a = 0.3f;
-
-  const float kPlaneSize = 0.7f;
-
   // Create a point on a plane by generating two vectors perpendicular to the normal
   Eigen::Vector3f basis1, basis2;
   basis1 = normal.unitOrthogonal();
   basis2 = normal.cross(basis1);
-
+  const float kPlaneSize = 0.7f;
   Eigen::Vector3f center(centroid.head<3>());
 
   std::vector<Eigen::Vector3f> corners;

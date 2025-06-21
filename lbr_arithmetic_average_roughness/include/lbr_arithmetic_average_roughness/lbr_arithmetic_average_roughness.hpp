@@ -63,6 +63,16 @@ private:
     const sensor_msgs::msg::PointCloud2::SharedPtr msg);
 
   /**
+   * @brief This function preprocess pointcloud.
+   *
+   * @param input_cloud,source_frame, target_frame
+   */
+  pcl::PointCloud<pcl::PointXYZ>::Ptr preProcessingPointCloud(
+      const sensor_msgs::msg::PointCloud2::SharedPtr & input_cloud,
+      const std::string & target_frame,
+      const std::string & source_frame);
+
+  /**
    * @brief This function transform pointcloud.
    *
    * @param input_cloud,source_frame, target_frame
