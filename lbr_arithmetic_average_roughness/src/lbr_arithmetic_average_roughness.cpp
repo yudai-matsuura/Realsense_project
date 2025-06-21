@@ -131,9 +131,23 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
 
 void ArithmeticAverageRoughness::slopePointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
+  // TODO: Consolidating common processes
+  // ****** Transform ****** //
+  const std::string target_frame = "world_frame";
+  const std::string source_frame = "camera_color_optical_frame";
+  geometry_msgs::msg::TransformStamped tf_msg_optical_to_world;
+  try{
+  tf_msg_optical_to_world = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(100));
+  } catch (tf2::TransformException & ex) {
+    RCLCPP_WARN(this->get_logger(), "Could not transform point cloud from %s to %s: %s", source_frame.c_str(), target_frame.c_str(), ex.what());
+    return;
+  }
+  sensor_msgs::msg::PointCloud2 transformed_cloud;
+  tf2::doTransform(*msg, transformed_cloud, tf_msg_optical_to_world);
+
   // ****** Convert Message Type ****** //
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*msg, *cloud);
+  pcl::fromROSMsg(transformed_cloud, *cloud);
   if(cloud->empty()) return;
 
   // ****** Filtering ****** //
@@ -153,30 +167,10 @@ void ArithmeticAverageRoughness::slopePointCloudCallback(const sensor_msgs::msg:
 
   // ****** Publish Local Normal Marker ****** //
   publishNormalVectorMarker(
-    centroid, normal, msg->header.frame_id, "local_normal", 0, 1.0f, 1.0f, 0.0f); // Yellow
-
-
-  // ****** Transform ****** //
-  Eigen::Vector3f normal_world = transformNormalToWorld(normal);
-
-  // ****** Publish World Normal Marker ****** //
-  geometry_msgs::msg::PointStamped centroid_local, centroid_world;
-  centroid_local.header.frame_id = msg->header.frame_id;
-  centroid_local.header.stamp = this->now();
-  centroid_local.point.x = centroid[0];
-  centroid_local.point.y = centroid[1];
-  centroid_local.point.z = centroid[2];
-  try {
-    tf_buffer_->transform(centroid_local, centroid_world, "world_frame"); // "world"は適宜変更
-    Eigen::Vector4f centroid_world_eigen(centroid_world.point.x, centroid_world.point.y, centroid_world.point.z, 0);
-    publishNormalVectorMarker(
-      centroid_world_eigen, normal_world, "world_frame", "world_normal", 0, 0.0f, 1.0f, 1.0f); // Cyan
-  } catch(const tf2::TransformException & ex) {
-    RCLCPP_WARN(this->get_logger(), "Could not transform centroid for visualization: %s", ex.what());
-  }
+    centroid, normal, target_frame, "world_normal", 0, 1.0f, 1.0f, 0.0f);
 
   // ****** Compute Angle ****** //
-  float angle = computeAngle(normal_world);
+  float angle = computeAngle(normal);
   RCLCPP_INFO(this->get_logger(), "Inclination angle [deg]: %.2f", angle);
 }
 
@@ -308,7 +302,6 @@ void ArithmeticAverageRoughness::publishCentroidMarker(const Eigen::Vector4f & c
 }
 #endif // DEBUG_ENABLED
 
-// .cppファイルに関数を追加
 void ArithmeticAverageRoughness::publishNormalVectorMarker(
   const Eigen::Vector4f & centroid, const Eigen::Vector3f & normal,
   const std::string & frame_id, const std::string & ns, int id,
@@ -323,16 +316,11 @@ void ArithmeticAverageRoughness::publishNormalVectorMarker(
   arrow_marker.action = visualization_msgs::msg::Marker::ADD;
   arrow_marker.lifetime = rclcpp::Duration::from_seconds(0);
 
-  // 矢印の開始点と終了点を設定
   geometry_msgs::msg::Point start_point, end_point;
-
-  // 開始点は平面の重心
   start_point.x = centroid[0];
   start_point.y = centroid[1];
   start_point.z = centroid[2];
-
-  // 終了点は重心から法線方向に一定の長さを伸ばした点
-  const float kArrowLength = 0.3f; // 矢印の長さ [m]
+  const float kArrowLength = 0.3f;
   Eigen::Vector3f normal_normalized = normal.normalized();
   end_point.x = start_point.x + normal_normalized.x() * kArrowLength;
   end_point.y = start_point.y + normal_normalized.y() * kArrowLength;
@@ -340,20 +328,13 @@ void ArithmeticAverageRoughness::publishNormalVectorMarker(
 
   arrow_marker.points.push_back(start_point);
   arrow_marker.points.push_back(end_point);
-
-  // 矢印のスケールを設定
-  // scale.x: 矢印の幹の直径
-  // scale.y: 矢印の先端の直径
-  // scale.z: 矢印の先端の長さ (v2.12.0以降、0だと先端が表示されない場合がある)
   arrow_marker.scale.x = 0.01;
   arrow_marker.scale.y = 0.02;
   arrow_marker.scale.z = 0.05;
-
-  // 矢印の色を設定
   arrow_marker.color.r = r;
   arrow_marker.color.g = g;
   arrow_marker.color.b = b;
-  arrow_marker.color.a = 0.9f; // 透明度
+  arrow_marker.color.a = 0.9f;
 
   marker_pub_->publish(arrow_marker);
 }
@@ -448,32 +429,6 @@ float ArithmeticAverageRoughness::computeRoughnessScore(const std::vector<float>
   float roughness_score = std::sqrt(sq_sum / filtered_pointcloud_number); // Standard deviation
   float normalized_score = std::min(1.0f, roughness_score / kMaximumRoughness);
   return normalized_score;
-}
-
-Eigen::Vector3f ArithmeticAverageRoughness::transformNormalToWorld(const Eigen::Vector3f & normal_local)
-{
-  const std::string target_frame = "world_frame";
-  const std::string source_frame = "camera_color_optical_frame";
-  geometry_msgs::msg::TransformStamped tf_msg_optical_to_world;
-  try{
-    tf_msg_optical_to_world = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(100));
-  } catch (tf2::TransformException & ex) {
-    RCLCPP_WARN(this->get_logger(), "Could not transform normal vector from %s to %s: %s", source_frame.c_str(), target_frame.c_str(), ex.what());
-    return normal_local; // fallback
-  }
-  tf2::Quaternion q(
-    tf_msg_optical_to_world.transform.rotation.x,
-    tf_msg_optical_to_world.transform.rotation.y,
-    tf_msg_optical_to_world.transform.rotation.z,
-    tf_msg_optical_to_world.transform.rotation.w);
-  tf2::Matrix3x3 m(q);
-  Eigen::Matrix3f rot;
-  for (int r = 0; r < 3; ++r) {
-    for (int c = 0; c < 3; ++c) {
-    rot(r, c) = m[r][c];
-    }
-  }
-    return rot * normal_local;
 }
 
 float ArithmeticAverageRoughness::computeAngle(

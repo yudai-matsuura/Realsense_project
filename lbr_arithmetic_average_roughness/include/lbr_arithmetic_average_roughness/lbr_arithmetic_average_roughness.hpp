@@ -132,13 +132,6 @@ private:
   float computeRoughnessScore(const std::vector<float> & distance);
 
   /**
-   * @brief This function transform normal to world frame.
-   *
-   * @param normal_local
-   */
-  Eigen::Vector3f transformNormalToWorld(const Eigen::Vector3f & normal_local);
-
-  /**
    * @brief This function calculate the estimated angle of the slope.
    *
    * @param plane_normal
