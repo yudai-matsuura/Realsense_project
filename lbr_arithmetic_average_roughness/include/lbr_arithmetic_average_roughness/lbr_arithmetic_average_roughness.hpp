@@ -33,9 +33,11 @@
 #include <tf2_ros/buffer.h>
 #include <tf2_sensor_msgs/tf2_sensor_msgs.hpp>
 #include <tf2_ros/transform_listener.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <geometry_msgs/msg/point.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
+#include <geometry_msgs/msg/point_stamped.hpp>
 
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -55,6 +57,9 @@ public:
 
 private:
   void pointCloudCallback(
+    const sensor_msgs::msg::PointCloud2::SharedPtr msg);
+
+  void slopePointCloudCallback(
     const sensor_msgs::msg::PointCloud2::SharedPtr msg);
 
   /**
@@ -126,11 +131,39 @@ private:
    */
   float computeRoughnessScore(const std::vector<float> & distance);
 
+  /**
+   * @brief This function transform normal to world frame.
+   *
+   * @param normal_local
+   */
+  Eigen::Vector3f transformNormalToWorld(const Eigen::Vector3f & normal_local);
+
+  /**
+   * @brief This function calculate the estimated angle of the slope.
+   *
+   * @param plane_normal
+   */
+  float computeAngle(const Eigen::Vector3f & plane_normal);
+
+  /**
+   * @brief This function publish normal marler.
+   *
+   * @param normal, centroid, frame_id
+   */
+  void publishNormalVectorMarker(
+    const Eigen::Vector4f & centroid,
+    const Eigen::Vector3f & normal,
+    const std::string & frame_id,
+    const std::string & ns, int id, float r, float g, float b
+  );
+
+
 // Publisher
 rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
 // Subscriber
-rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr extracted_pointcloud_sub_;
+rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr uneven_terrain_pointcloud_sub_;
 rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_raw_sub_;
+rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr slope_pointcloud_sub_;
 // Variables
 std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
 std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};

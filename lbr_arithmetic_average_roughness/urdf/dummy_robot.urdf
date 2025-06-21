@@ -1,6 +1,13 @@
 <robot name="dummy_robot">
-    <link name="base_link">
-    </link>
+    <link name="world_frame"/>
+
+    <joint name="world_to_base" type="fixed">
+        <parent link="world_frame"/>
+        <child link="base_link"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <link name="base_link"/>
 
     <joint name="base_to_camera" type="fixed">
         <parent link="base_link"/>

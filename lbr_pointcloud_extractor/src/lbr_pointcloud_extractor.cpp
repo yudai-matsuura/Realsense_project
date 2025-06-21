@@ -36,7 +36,7 @@ PointCloudExtractor::PointCloudExtractor(const rclcpp::NodeOptions & options)
   std::cout << "PointCloudExtractor class is established." << std::endl;
   // Publisher
   extracted_pointcloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-    "/extracted_pointcloud", 10);
+    "/uneven_terrain_pointcloud", 10);
 
   // Subscriber
   depth_image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(

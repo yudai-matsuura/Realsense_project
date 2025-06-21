@@ -17,6 +17,7 @@
 #include <rclcpp_components/register_node_macro.hpp>
 
 #define DEBUG_ENABLED false
+#define ANGLE_CALCULATION_MODE true
 namespace lbr_arithmetic_average_roughness
 {
 constexpr float kVoxelSize = 0.01f; //[m]
@@ -30,9 +31,16 @@ ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions
   // Publisher
   marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/marker", 10);
   // Subscriber
-  extracted_pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    "/extracted_pointcloud", rclcpp::SensorDataQoS(),
+  // TODO: Need to think about the configuration of this part.
+  uneven_terrain_pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+    "/uneven_terrain_pointcloud", rclcpp::SensorDataQoS(),
     std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
+
+#if ANGLE_CALCULATION_MODE
+  slope_pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+    "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
+    std::bind(&ArithmeticAverageRoughness::slopePointCloudCallback, this, std::placeholders::_1));
+#endif // ANGLE_CALCULATION_MODE
 
 #if DEBUG_ENABLED
   pointcloud_raw_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -121,6 +129,57 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   publishRoughnessHeatMap(inlier_cloud, target_frame, inlier_distances);
 }
 
+void ArithmeticAverageRoughness::slopePointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+{
+  // ****** Convert Message Type ****** //
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::fromROSMsg(*msg, *cloud);
+  if(cloud->empty()) return;
+
+  // ****** Filtering ****** //
+  pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled_cloud = downsamplePointCloud(cloud);
+  if(downsampled_cloud->empty()) return;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr nan_removed_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  std::vector<int> indices;
+  pcl::removeNaNFromPointCloud(*downsampled_cloud, *nan_removed_cloud, indices);
+  if(nan_removed_cloud->empty()) return;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud = removeOutlierFromPointCloud(nan_removed_cloud);
+  if(filtered_cloud->empty()) return;
+
+  // ****** Estimate Plane ****** //
+  Eigen::Vector4f centroid;
+  Eigen::Vector3f normal;
+  estimateRegressionPlane(filtered_cloud, centroid, normal);
+
+  // ****** Publish Local Normal Marker ****** //
+  publishNormalVectorMarker(
+    centroid, normal, msg->header.frame_id, "local_normal", 0, 1.0f, 1.0f, 0.0f); // Yellow
+
+
+  // ****** Transform ****** //
+  Eigen::Vector3f normal_world = transformNormalToWorld(normal);
+
+  // ****** Publish World Normal Marker ****** //
+  geometry_msgs::msg::PointStamped centroid_local, centroid_world;
+  centroid_local.header.frame_id = msg->header.frame_id;
+  centroid_local.header.stamp = this->now();
+  centroid_local.point.x = centroid[0];
+  centroid_local.point.y = centroid[1];
+  centroid_local.point.z = centroid[2];
+  try {
+    tf_buffer_->transform(centroid_local, centroid_world, "world_frame"); // "world"は適宜変更
+    Eigen::Vector4f centroid_world_eigen(centroid_world.point.x, centroid_world.point.y, centroid_world.point.z, 0);
+    publishNormalVectorMarker(
+      centroid_world_eigen, normal_world, "world_frame", "world_normal", 0, 0.0f, 1.0f, 1.0f); // Cyan
+  } catch(const tf2::TransformException & ex) {
+    RCLCPP_WARN(this->get_logger(), "Could not transform centroid for visualization: %s", ex.what());
+  }
+
+  // ****** Compute Angle ****** //
+  float angle = computeAngle(normal_world);
+  RCLCPP_INFO(this->get_logger(), "Inclination angle [deg]: %.2f", angle);
+}
+
 pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
 {
   pcl::VoxelGrid<pcl::PointXYZ> sor;
@@ -155,11 +214,11 @@ void ArithmeticAverageRoughness::estimateRegressionPlane(const pcl::PointCloud<p
     centered(2, i) = cloud->points[i].z - plane_centroid[2];
   }
 
-  // Calculate the convariance matrix
-  Eigen::Matrix3f convariance = centered * centered.transpose();
+  // Calculate the covariance matrix
+  Eigen::Matrix3f covariance = centered * centered.transpose();
 
-  // Calculates the eigenvalues of the convariance matrix
-  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> solver(convariance);
+  // Calculates the eigenvalues of the covariance matrix
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> solver(covariance);
   if (solver.info() != Eigen::Success) {
     throw std::runtime_error("Eigen decomposition failed");
   }
@@ -248,6 +307,56 @@ void ArithmeticAverageRoughness::publishCentroidMarker(const Eigen::Vector4f & c
   marker_pub_->publish(centroid_marker);
 }
 #endif // DEBUG_ENABLED
+
+// .cppファイルに関数を追加
+void ArithmeticAverageRoughness::publishNormalVectorMarker(
+  const Eigen::Vector4f & centroid, const Eigen::Vector3f & normal,
+  const std::string & frame_id, const std::string & ns, int id,
+  float r, float g, float b)
+{
+  visualization_msgs::msg::Marker arrow_marker;
+  arrow_marker.header.frame_id = frame_id;
+  arrow_marker.header.stamp = this->now();
+  arrow_marker.ns = ns;
+  arrow_marker.id = id;
+  arrow_marker.type = visualization_msgs::msg::Marker::ARROW;
+  arrow_marker.action = visualization_msgs::msg::Marker::ADD;
+  arrow_marker.lifetime = rclcpp::Duration::from_seconds(0);
+
+  // 矢印の開始点と終了点を設定
+  geometry_msgs::msg::Point start_point, end_point;
+
+  // 開始点は平面の重心
+  start_point.x = centroid[0];
+  start_point.y = centroid[1];
+  start_point.z = centroid[2];
+
+  // 終了点は重心から法線方向に一定の長さを伸ばした点
+  const float kArrowLength = 0.3f; // 矢印の長さ [m]
+  Eigen::Vector3f normal_normalized = normal.normalized();
+  end_point.x = start_point.x + normal_normalized.x() * kArrowLength;
+  end_point.y = start_point.y + normal_normalized.y() * kArrowLength;
+  end_point.z = start_point.z + normal_normalized.z() * kArrowLength;
+
+  arrow_marker.points.push_back(start_point);
+  arrow_marker.points.push_back(end_point);
+
+  // 矢印のスケールを設定
+  // scale.x: 矢印の幹の直径
+  // scale.y: 矢印の先端の直径
+  // scale.z: 矢印の先端の長さ (v2.12.0以降、0だと先端が表示されない場合がある)
+  arrow_marker.scale.x = 0.01;
+  arrow_marker.scale.y = 0.02;
+  arrow_marker.scale.z = 0.05;
+
+  // 矢印の色を設定
+  arrow_marker.color.r = r;
+  arrow_marker.color.g = g;
+  arrow_marker.color.b = b;
+  arrow_marker.color.a = 0.9f; // 透明度
+
+  marker_pub_->publish(arrow_marker);
+}
 
 std::vector<float> ArithmeticAverageRoughness::computePointToPlaneDistance(
   const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
@@ -339,6 +448,45 @@ float ArithmeticAverageRoughness::computeRoughnessScore(const std::vector<float>
   float roughness_score = std::sqrt(sq_sum / filtered_pointcloud_number); // Standard deviation
   float normalized_score = std::min(1.0f, roughness_score / kMaximumRoughness);
   return normalized_score;
+}
+
+Eigen::Vector3f ArithmeticAverageRoughness::transformNormalToWorld(const Eigen::Vector3f & normal_local)
+{
+  const std::string target_frame = "world_frame";
+  const std::string source_frame = "camera_color_optical_frame";
+  geometry_msgs::msg::TransformStamped tf_msg_optical_to_world;
+  try{
+    tf_msg_optical_to_world = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(100));
+  } catch (tf2::TransformException & ex) {
+    RCLCPP_WARN(this->get_logger(), "Could not transform normal vector from %s to %s: %s", source_frame.c_str(), target_frame.c_str(), ex.what());
+    return normal_local; // fallback
+  }
+  tf2::Quaternion q(
+    tf_msg_optical_to_world.transform.rotation.x,
+    tf_msg_optical_to_world.transform.rotation.y,
+    tf_msg_optical_to_world.transform.rotation.z,
+    tf_msg_optical_to_world.transform.rotation.w);
+  tf2::Matrix3x3 m(q);
+  Eigen::Matrix3f rot;
+  for (int r = 0; r < 3; ++r) {
+    for (int c = 0; c < 3; ++c) {
+    rot(r, c) = m[r][c];
+    }
+  }
+    return rot * normal_local;
+}
+
+float ArithmeticAverageRoughness::computeAngle(
+  const Eigen::Vector3f & plane_normal)
+{
+  Eigen::Vector3f world_z_axis(0.0f, 0.0f, 1.0f);
+  float inner_product = plane_normal.normalized().dot(world_z_axis);
+  float angle_rad = std::acos(std::clamp(inner_product, -1.0f, 1.0f));
+  float angle = angle_rad * 180.0f / static_cast<float>(M_PI); // Convert to degrees
+  if (angle > 90.0f) {
+    angle = 180.0f - angle;
+  }
+  return angle;
 }
 
 }  // namespace lbr_arithmetic_average_roughness
