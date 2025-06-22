@@ -17,7 +17,6 @@
 #include <rclcpp_components/register_node_macro.hpp>
 
 #define DEBUG_ENABLED false
-#define ANGLE_CALCULATION_MODE true
 namespace lbr_arithmetic_average_roughness
 {
 constexpr float kVoxelSize = 0.01f; //[m]
@@ -30,23 +29,16 @@ ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions
   std::cout << "ArithmeticAverageRoughness class is established." << std::endl;
   // Publisher
   marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/marker", 10);
+
   // Subscriber
-  // TODO: Need to think about the configuration of this part.
+  // NOTE: Change the topic name to "/camera/camera/depth/color/points" if you want check with raw pointcloud
   uneven_terrain_pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     "/uneven_terrain_pointcloud", rclcpp::SensorDataQoS(),
     std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
 
-#if ANGLE_CALCULATION_MODE
   slope_pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
     std::bind(&ArithmeticAverageRoughness::slopePointCloudCallback, this, std::placeholders::_1));
-#endif // ANGLE_CALCULATION_MODE
-
-#if DEBUG_ENABLED
-  pointcloud_raw_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
-    std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
-#endif // DEBUG_ENABLED
 
   // TF
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -229,7 +221,6 @@ void ArithmeticAverageRoughness::estimateRegressionPlane(const pcl::PointCloud<p
     centered(1, i) = cloud->points[i].y - plane_centroid[1];
     centered(2, i) = cloud->points[i].z - plane_centroid[2];
   }
-
   // Calculate the covariance matrix
   Eigen::Matrix3f covariance = centered * centered.transpose();
 
@@ -238,16 +229,13 @@ void ArithmeticAverageRoughness::estimateRegressionPlane(const pcl::PointCloud<p
   if (solver.info() != Eigen::Success) {
     throw std::runtime_error("Eigen decomposition failed");
   }
-
   // The eigenvector corresponding to the smallest eigenvalue (normal of the plane)
+  //TODO: Need to consider the direction of the normal vector
   plane_normal = solver.eigenvectors().col(0);
 }
 
 void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f & centroid, const Eigen::Vector3f & normal, const std::string & frame_id)
 {
-  // --------------------------
-  // Visualize estimated plane
-  // --------------------------
   visualization_msgs::msg::Marker plane_marker;
   plane_marker.header.frame_id = frame_id;
   plane_marker.header.stamp = this->now();
@@ -438,6 +426,7 @@ void ArithmeticAverageRoughness::publishRoughnessHeatMap(
 float ArithmeticAverageRoughness::computeRoughnessScore(const std::vector<float> & distances)
 {
   float sq_sum = 0.0f;
+  // TODO: This kMaximumRoughness value needs to be adjusted
   float kMaximumRoughness = 0.05f; // Maximum roughness threshold in meters
   size_t filtered_pointcloud_number = distances.size();
 
