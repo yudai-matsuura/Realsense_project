@@ -29,16 +29,16 @@ ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions
   std::cout << "ArithmeticAverageRoughness class is established." << std::endl;
   // Publisher
   marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/marker", 10);
+
   // Subscriber
-  extracted_pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    "/extracted_pointcloud", rclcpp::SensorDataQoS(),
+  // NOTE: Change the topic name to "/camera/camera/depth/color/points" if you want check with raw pointcloud
+  uneven_terrain_pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+    "/uneven_terrain_pointcloud", rclcpp::SensorDataQoS(),
     std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
 
-#if DEBUG_ENABLED
-  pointcloud_raw_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+  slope_pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
-    std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
-#endif // DEBUG_ENABLED
+    std::bind(&ArithmeticAverageRoughness::slopePointCloudCallback, this, std::placeholders::_1));
 
   // TF
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -53,38 +53,28 @@ ArithmeticAverageRoughness::~ArithmeticAverageRoughness()
 
 void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
-  // ****** Transform ****** //
+  // ****** Preprocessing ****** //
   const std::string target_frame = "base_link";
   const std::string source_frame = "camera_color_optical_frame";
-  geometry_msgs::msg::TransformStamped tf_msg_optical_to_base;
-  try{
-  tf_msg_optical_to_base = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(100));
-  } catch (tf2::TransformException & ex) {
-    RCLCPP_WARN(this->get_logger(), "Could not transform point cloud from %s to %s: %s", source_frame.c_str(), target_frame.c_str(), ex.what());
+  auto filtered_cloud = preProcessingPointCloud(msg, target_frame, source_frame);
+  if(!filtered_cloud) {
+    RCLCPP_WARN(this->get_logger(), "Preprocessing returned a null point cloud. Skipping further processing.");
     return;
   }
-  sensor_msgs::msg::PointCloud2 transformed_cloud;
-  tf2::doTransform(*msg, transformed_cloud, tf_msg_optical_to_base);
-
-  // ****** Convert Message Type ****** //
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(transformed_cloud, *cloud);
-  if(cloud->empty()) return;
-
-  // ****** Filtering ****** //
-  pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled_cloud = downsamplePointCloud(cloud);
-  if(downsampled_cloud->empty()) return;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr nan_removed_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  std::vector<int> indices;
-  pcl::removeNaNFromPointCloud(*downsampled_cloud, *nan_removed_cloud, indices);
-  if(nan_removed_cloud->empty()) return;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud = removeOutlierFromPointCloud(nan_removed_cloud);
-  if(filtered_cloud->empty()) return;
+  if(filtered_cloud->empty()) {
+    RCLCPP_DEBUG(this->get_logger(), "Filtered point cloud is empty. Skipping further processing.");
+    return;
+  }
 
   // ****** Estimate Plane ****** //
   Eigen::Vector4f centroid;
   Eigen::Vector3f normal;
-  estimateRegressionPlane(filtered_cloud, centroid, normal);
+  try{
+    estimateRegressionPlane(filtered_cloud, centroid, normal);
+    } catch (const std::runtime_error & e) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to estimate regression plane: %s", e.what());
+      return;
+    }
 
   // ****** Compute Distances ****** //
   std::vector<float> distances = computePointToPlaneDistance(filtered_cloud, centroid, normal);
@@ -121,6 +111,83 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   publishRoughnessHeatMap(inlier_cloud, target_frame, inlier_distances);
 }
 
+void ArithmeticAverageRoughness::slopePointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+{
+  // ****** Preprocessing ****** //
+  const std::string target_frame = "world_frame";
+  const std::string source_frame = "camera_color_optical_frame";
+  auto filtered_cloud = preProcessingPointCloud(msg, target_frame, source_frame);
+  if(!filtered_cloud) {
+    RCLCPP_WARN(this->get_logger(), "Preprocessing returned a null point cloud. Skipping further processing.");
+    return;
+  }
+  if(filtered_cloud->empty()) {
+    RCLCPP_DEBUG(this->get_logger(), "Filtered point cloud is empty. Skipping further processing.");
+    return;
+  }
+
+  // ****** Estimate Plane ****** //
+  Eigen::Vector4f centroid;
+  Eigen::Vector3f normal;
+  try{
+  estimateRegressionPlane(filtered_cloud, centroid, normal);
+  } catch (const std::runtime_error & e) {
+    RCLCPP_ERROR(this->get_logger(), "Failed to estimate regression plane: %s", e.what());
+    return;
+  }
+
+  // ****** Publish Local Normal Marker ****** //
+  publishNormalVectorMarker(
+    centroid, normal, target_frame, "world_normal", 0, 1.0f, 1.0f, 0.0f);
+
+  // ****** Compute Angle ****** //
+  float angle = computeAngle(normal);
+  RCLCPP_INFO(this->get_logger(), "Inclination angle [deg]: %.2f", angle);
+}
+
+pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::preProcessingPointCloud(
+  const sensor_msgs::msg::PointCloud2::SharedPtr & input_cloud,
+  const std::string & target_frame,
+  const std::string & source_frame)
+{
+  // ****** Transform ****** //
+  auto transformed_cloud = transformPointCloud(input_cloud, target_frame, source_frame);
+  if (!transformed_cloud) return nullptr;
+
+  // ****** Convert Message Type ****** //
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::fromROSMsg(*transformed_cloud, *cloud);
+  if(cloud->empty()) return nullptr;
+
+  // ****** Filtering ****** //
+  pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled_cloud = downsamplePointCloud(cloud);
+  if(downsampled_cloud->empty()) return nullptr;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr nan_removed_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  std::vector<int> indices;
+  pcl::removeNaNFromPointCloud(*downsampled_cloud, *nan_removed_cloud, indices);
+  if(nan_removed_cloud->empty()) return nullptr;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud = removeOutlierFromPointCloud(nan_removed_cloud);
+  if(filtered_cloud->empty()) return nullptr;
+
+  return filtered_cloud;
+}
+
+sensor_msgs::msg::PointCloud2::SharedPtr ArithmeticAverageRoughness::transformPointCloud(
+  const sensor_msgs::msg::PointCloud2::SharedPtr & input_cloud,
+  const std::string & target_frame, const std::string & source_frame)
+{
+  geometry_msgs::msg::TransformStamped tf_msg;
+  try{
+    tf_msg = tf_buffer_->lookupTransform(target_frame, source_frame, tf2::TimePointZero, std::chrono::milliseconds(100));
+    } catch (tf2::TransformException & ex) {
+      RCLCPP_WARN(this->get_logger(), "Could not transform point cloud from %s to %s: %s", source_frame.c_str(), target_frame.c_str(), ex.what());
+      return nullptr;
+    }
+    auto transformed = std::make_shared<sensor_msgs::msg::PointCloud2>();
+    tf2::doTransform(*input_cloud, *transformed, tf_msg);
+    return transformed;
+}
+
 pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
 {
   pcl::VoxelGrid<pcl::PointXYZ> sor;
@@ -154,25 +221,21 @@ void ArithmeticAverageRoughness::estimateRegressionPlane(const pcl::PointCloud<p
     centered(1, i) = cloud->points[i].y - plane_centroid[1];
     centered(2, i) = cloud->points[i].z - plane_centroid[2];
   }
+  // Calculate the covariance matrix
+  Eigen::Matrix3f covariance = centered * centered.transpose();
 
-  // Calculate the convariance matrix
-  Eigen::Matrix3f convariance = centered * centered.transpose();
-
-  // Calculates the eigenvalues of the convariance matrix
-  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> solver(convariance);
+  // Calculates the eigenvalues of the covariance matrix
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> solver(covariance);
   if (solver.info() != Eigen::Success) {
     throw std::runtime_error("Eigen decomposition failed");
   }
-
   // The eigenvector corresponding to the smallest eigenvalue (normal of the plane)
+  //TODO: Need to consider the direction of the normal vector
   plane_normal = solver.eigenvectors().col(0);
 }
 
 void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f & centroid, const Eigen::Vector3f & normal, const std::string & frame_id)
 {
-  // --------------------------
-  // Visualize estimated plane
-  // --------------------------
   visualization_msgs::msg::Marker plane_marker;
   plane_marker.header.frame_id = frame_id;
   plane_marker.header.stamp = this->now();
@@ -187,14 +250,11 @@ void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f & cent
   plane_marker.color.g = 1.0f;
   plane_marker.color.b = 0.0f;
   plane_marker.color.a = 0.3f;
-
-  const float kPlaneSize = 0.7f;
-
   // Create a point on a plane by generating two vectors perpendicular to the normal
   Eigen::Vector3f basis1, basis2;
   basis1 = normal.unitOrthogonal();
   basis2 = normal.cross(basis1);
-
+  const float kPlaneSize = 0.7f;
   Eigen::Vector3f center(centroid.head<3>());
 
   std::vector<Eigen::Vector3f> corners;
@@ -248,6 +308,43 @@ void ArithmeticAverageRoughness::publishCentroidMarker(const Eigen::Vector4f & c
   marker_pub_->publish(centroid_marker);
 }
 #endif // DEBUG_ENABLED
+
+void ArithmeticAverageRoughness::publishNormalVectorMarker(
+  const Eigen::Vector4f & centroid, const Eigen::Vector3f & normal,
+  const std::string & frame_id, const std::string & ns, int id,
+  float r, float g, float b)
+{
+  visualization_msgs::msg::Marker arrow_marker;
+  arrow_marker.header.frame_id = frame_id;
+  arrow_marker.header.stamp = this->now();
+  arrow_marker.ns = ns;
+  arrow_marker.id = id;
+  arrow_marker.type = visualization_msgs::msg::Marker::ARROW;
+  arrow_marker.action = visualization_msgs::msg::Marker::ADD;
+  arrow_marker.lifetime = rclcpp::Duration::from_seconds(0);
+
+  geometry_msgs::msg::Point start_point, end_point;
+  start_point.x = centroid[0];
+  start_point.y = centroid[1];
+  start_point.z = centroid[2];
+  const float kArrowLength = 0.3f;
+  Eigen::Vector3f normal_normalized = normal.normalized();
+  end_point.x = start_point.x + normal_normalized.x() * kArrowLength;
+  end_point.y = start_point.y + normal_normalized.y() * kArrowLength;
+  end_point.z = start_point.z + normal_normalized.z() * kArrowLength;
+
+  arrow_marker.points.push_back(start_point);
+  arrow_marker.points.push_back(end_point);
+  arrow_marker.scale.x = 0.01;
+  arrow_marker.scale.y = 0.02;
+  arrow_marker.scale.z = 0.05;
+  arrow_marker.color.r = r;
+  arrow_marker.color.g = g;
+  arrow_marker.color.b = b;
+  arrow_marker.color.a = 0.9f;
+
+  marker_pub_->publish(arrow_marker);
+}
 
 std::vector<float> ArithmeticAverageRoughness::computePointToPlaneDistance(
   const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
@@ -329,6 +426,7 @@ void ArithmeticAverageRoughness::publishRoughnessHeatMap(
 float ArithmeticAverageRoughness::computeRoughnessScore(const std::vector<float> & distances)
 {
   float sq_sum = 0.0f;
+  // TODO: This kMaximumRoughness value needs to be adjusted
   float kMaximumRoughness = 0.05f; // Maximum roughness threshold in meters
   size_t filtered_pointcloud_number = distances.size();
 
@@ -339,6 +437,19 @@ float ArithmeticAverageRoughness::computeRoughnessScore(const std::vector<float>
   float roughness_score = std::sqrt(sq_sum / filtered_pointcloud_number); // Standard deviation
   float normalized_score = std::min(1.0f, roughness_score / kMaximumRoughness);
   return normalized_score;
+}
+
+float ArithmeticAverageRoughness::computeAngle(
+  const Eigen::Vector3f & plane_normal)
+{
+  Eigen::Vector3f world_z_axis(0.0f, 0.0f, 1.0f);
+  float inner_product = plane_normal.normalized().dot(world_z_axis);
+  float angle_rad = std::acos(std::clamp(inner_product, -1.0f, 1.0f));
+  float angle = angle_rad * 180.0f / static_cast<float>(M_PI); // Convert to degrees
+  if (angle > 90.0f) {
+    angle = 180.0f - angle;
+  }
+  return angle;
 }
 
 }  // namespace lbr_arithmetic_average_roughness
