@@ -67,12 +67,26 @@ private:
     void bboxCallback(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
 
     /**
+     * @brief This callback function runs when subscribes mask image.
+     *
+     * @param msg
+     */
+    void maskImageCallback(const sensor_msgs::msg::Image::SharedPtr msg);
+
+    /**
      * @brief This function runs when subscribes camera info topic.
      *
      * @param msg
      */
     void cameraInfoCallback(
       const sensor_msgs::msg::CameraInfo::SharedPtr msg);
+
+    /**
+     * @brief This function runs when subscribes camera info topic.
+     *
+     * @param
+     */
+    void declareDefaultIntrinsics();
 
     /**
      * @brief This function extract the pointcloud inside the bounding boxes
@@ -82,6 +96,24 @@ private:
     sensor_msgs::msg::PointCloud2 extractPointCloudFromBBoxes(
       const std::vector<BBox2D> & bboxes,
       const sensor_msgs::msg::Image & depth_img);
+
+    /**
+     * @brief This function extract mask pixels from the mask image
+     *
+     * @param mask_img, target_bgr
+     */
+    std::vector<cv::Point> extractMaskPixels(
+      const cv::Mat & mask_img,
+      const cv::Vec3b & target_bgr);
+
+    /**
+     * @brief This function extract the pointcloud from Mask
+     *
+     * @param depth_img, pixels
+     */
+    sensor_msgs::msg::PointCloud2 extractPointCloudFromMask(
+      const sensor_msgs::msg::Image & depth_img,
+      const std::vector<cv::Point> & pixels);
 
     /**
      * @brief This function extracts the bounding box coordinate from bbox_msg
@@ -95,6 +127,9 @@ private:
 rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_image_sub_;
 rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr bbox_sub_;
 rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;
+rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_sub_;
+rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr mask_sub_;
+
 
 // Publisher
 rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr extracted_pointcloud_pub_;
