@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>lbr_terrain_analysis</name>
+  <name>lbr_normal_analysis_roughness</name>
   <version>1.0.0</version>
   <description>Terrain roughness analysis using PCL</description>
   <maintainer email="matsuura.yudai.q5@dc.tohoku.ac.jp">Yudai Matsuura</maintainer>
