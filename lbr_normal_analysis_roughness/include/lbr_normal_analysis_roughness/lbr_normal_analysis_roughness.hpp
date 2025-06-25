@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef lbr_terrain_analysis__lbr_terrain_analysis_HPP_
-#define lbr_terrain_analysis__lbr_terrain_analysis_HPP_
+#ifndef lbr_normal_analysis_roughness__lbr_normal_analysis_roughness_HPP_
+#define lbr_normal_analysis_roughness__lbr_normal_analysis_roughness_HPP_
 
 #include <chrono>
 #include <cstdio>
@@ -36,15 +36,15 @@
 #include <geometry_msgs/msg/point.hpp>
 
 
-#include "lbr_terrain_analysis/visibility_control.h"
+#include "lbr_normal_analysis_roughness/visibility_control.h"
 
-namespace lbr_terrain_analysis
+namespace lbr_normal_analysis_roughness
 {
 
 class TerrainAnalysis : public rclcpp::Node
 {
 public:
-  lbr_terrain_analysis_PUBLIC
+  lbr_normal_analysis_roughness_PUBLIC
   explicit TerrainAnalysis(const rclcpp::NodeOptions & options);
 
   virtual ~TerrainAnalysis();
@@ -84,6 +84,6 @@ private:
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_sub_;
 };
 
-}  // namespace lbr_terrain_analysis
+}  // namespace lbr_normal_analysis_roughness
 
-#endif  // lbr_terrain_analysis__lbr_terrain_analysis_HPP_
+#endif  // lbr_normal_analysis_roughness__lbr_normal_analysis_roughness_HPP_

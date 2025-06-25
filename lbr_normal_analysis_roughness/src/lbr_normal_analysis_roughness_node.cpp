@@ -12,21 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <gtest/gtest.h>
+#include "lbr_normal_analysis_roughness/lbr_normal_analysis_roughness.hpp"
 
-#include "lbr_terrain_analysis/lbr_terrain_analysis.hpp"
-
-namespace lbr_terrain_analysis
+int main(int argc, char * argv[])
 {
+  rclcpp::init(argc, argv);
+  rclcpp::executors::MultiThreadedExecutor exec;
 
-TEST(LbrTerrainAnalysis, oneTestCase)
-{
+  const auto lbr_normal_analysis_roughness =
+    std::make_shared<lbr_normal_analysis_roughness::TerrainAnalysis>(rclcpp::NodeOptions());
+  exec.add_node(lbr_normal_analysis_roughness);
+
+  exec.spin();
+
+  rclcpp::shutdown();
 }
-
-int main(int argc, char ** argv)
-{
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
-
-}  // namespace lbr_terrain_analysis

@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "lbr_terrain_analysis/lbr_terrain_analysis.hpp"
+#include "lbr_normal_analysis_roughness/lbr_normal_analysis_roughness.hpp"
 
 #include <rclcpp_components/register_node_macro.hpp>
 
 #define DEBUG_ENABLED false
-namespace lbr_terrain_analysis
+namespace lbr_normal_analysis_roughness
 {
 
 TerrainAnalysis::TerrainAnalysis(const rclcpp::NodeOptions & options)
-: rclcpp::Node("lbr_terrain_analysis", options)
+: rclcpp::Node("lbr_normal_analysis_roughness", options)
 {
   std::cout << "TerrainAnalysis class is established." << std::endl;
   // Publisher
@@ -144,6 +144,6 @@ void TerrainAnalysis::publishNormals(
 
 }
 
-}  // namespace lbr_terrain_analysis
+}  // namespace lbr_normal_analysis_roughness
 
-RCLCPP_COMPONENTS_REGISTER_NODE(lbr_terrain_analysis::TerrainAnalysis)
+RCLCPP_COMPONENTS_REGISTER_NODE(lbr_normal_analysis_roughness::TerrainAnalysis)

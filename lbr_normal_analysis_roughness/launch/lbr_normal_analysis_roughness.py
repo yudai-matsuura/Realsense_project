@@ -6,15 +6,15 @@ import os
 
 def generate_launch_description():
     rviz_config_path = os.path.join(
-        get_package_share_directory('lbr_terrain_analysis'),
+        get_package_share_directory('lbr_normal_analysis_roughness'),
         'config',
-        'terrain_analysis.rviz'
+        'lbr_normal_analysis_roughness.rviz'
     )
     return LaunchDescription([
         Node(
-            package="lbr_terrain_analysis",
-            executable="lbr_terrain_analysis_node",
-            name="lbr_terrain_analysis",
+            package="lbr_normal_analysis_roughness",
+            executable="lbr_normal_analysis_roughness_node",
+            name="lbr_normal_analysis_roughness",
             output="screen",
         ),
         Node(
