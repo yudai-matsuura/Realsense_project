@@ -33,12 +33,12 @@ ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions
   // Subscriber
   // NOTE: Change the topic name to "/camera/camera/depth/color/points" if you want check with raw pointcloud
   uneven_terrain_pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    "/uneven_terrain_pointcloud", rclcpp::SensorDataQoS(),
+    "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
     std::bind(&ArithmeticAverageRoughness::pointCloudCallback, this, std::placeholders::_1));
 
-  slope_pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
-    std::bind(&ArithmeticAverageRoughness::slopePointCloudCallback, this, std::placeholders::_1));
+  // slope_pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+  //   "/camera/camera/depth/color/points", rclcpp::SensorDataQoS(),
+  //   std::bind(&ArithmeticAverageRoughness::slopePointCloudCallback, this, std::placeholders::_1));
 
   // TF
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -232,6 +232,10 @@ void ArithmeticAverageRoughness::estimateRegressionPlane(const pcl::PointCloud<p
   // The eigenvector corresponding to the smallest eigenvalue (normal of the plane)
   //TODO: Need to consider the direction of the normal vector
   plane_normal = solver.eigenvectors().col(0);
+  Eigen::Vector3f up_vector(0.0f, 0.0f, 1.0f);
+  if (plane_normal.dot(up_vector) < 0.0f) {
+    plane_normal = -plane_normal;  // Unify Orientation
+  }
 }
 
 void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f & centroid, const Eigen::Vector3f & normal, const std::string & frame_id)
@@ -270,12 +274,8 @@ void ArithmeticAverageRoughness::publishPlaneMarker(const Eigen::Vector4f & cent
   p2.x = corners[2].x(); p2.y = corners[2].y(); p2.z = corners[2].z();
   p3.x = corners[3].x(); p3.y = corners[3].y(); p3.z = corners[3].z();
 
-  // Both side of the plane
   plane_marker.points.push_back(p0); plane_marker.points.push_back(p1); plane_marker.points.push_back(p2);
   plane_marker.points.push_back(p2); plane_marker.points.push_back(p3); plane_marker.points.push_back(p0);
-  plane_marker.points.push_back(p2); plane_marker.points.push_back(p1); plane_marker.points.push_back(p0);
-  plane_marker.points.push_back(p0); plane_marker.points.push_back(p3); plane_marker.points.push_back(p2);
-
   marker_pub_->publish(plane_marker);
 }
 
