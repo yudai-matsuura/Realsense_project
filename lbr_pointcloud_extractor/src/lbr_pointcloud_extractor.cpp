@@ -19,18 +19,6 @@
 #define DEBUG_ENABLED false
 namespace lbr_pointcloud_extractor
 {
-constexpr size_t kBBoxElementNum = 4; // x_min, y_min, x_max, y_max
-constexpr int x_min_index = 0;
-constexpr int y_min_index = 1;
-constexpr int x_max_index = 2;
-constexpr int y_max_index = 3;
-// Indices for the intrinsic camera matrix K
-constexpr int K_fx = 0;
-constexpr int K_cx = 2;
-constexpr int K_fy = 4;
-constexpr int K_cy = 5;
-constexpr float kDepthThreshold = 2.0f;  // 2メートル以内のみ使用
-
 
 PointCloudExtractor::PointCloudExtractor(const rclcpp::NodeOptions & options)
 : rclcpp::Node("lbr_pointcloud_extractor", options)
@@ -49,10 +37,10 @@ PointCloudExtractor::PointCloudExtractor(const rclcpp::NodeOptions & options)
     "/yolo_bboxes", rclcpp::SensorDataQoS(),
     std::bind(&PointCloudExtractor::bboxCallback, this, std::placeholders::_1));
 
-  // camera_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
-  //   "/camera/camera/aligned_depth_to_color/camera_info", rclcpp::SensorDataQoS(),
-  //   std::bind(&PointCloudExtractor::cameraInfoCallback, this, std::placeholders::_1));
-  declareDefaultIntrinsics();
+  camera_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
+    "/camera/camera/aligned_depth_to_color/camera_info", rclcpp::SensorDataQoS(),
+    std::bind(&PointCloudExtractor::cameraInfoCallback, this, std::placeholders::_1));
+  // declareDefaultIntrinsics();
 
   // These topic is from LuSNAR Datasets
   depth_sub_= this->create_subscription<sensor_msgs::msg::Image>(
@@ -134,6 +122,11 @@ std::vector<BBox2D> PointCloudExtractor::extractBBoxCoordinates(
 {
   std::vector<BBox2D> bboxes;
   const auto & data = bbox_msg->data;
+  const size_t kBBoxElementNum = 4; // x_min, y_min, x_max, y_max
+  const int x_min_index = 0;
+  const int y_min_index = 1;
+  const int x_max_index = 2;
+  const int y_max_index = 3;
 
   for (size_t i = 0; i + (kBBoxElementNum - 1) < data.size(); i += kBBoxElementNum) {
     BBox2D bbox;
@@ -258,6 +251,7 @@ sensor_msgs::msg::PointCloud2 PointCloudExtractor::extractPointCloudFromMask(
     }
     // convert to m
     float depth_m = static_cast<float>(depth_mm) * 0.001f;
+    const float kDepthThreshold = 2.0f;  // 2メートル以内のみ使用
 
     if (depth_m > 0.0f && depth_m < kDepthThreshold && std::isfinite(depth_m)) {
       float pixel[2] = {static_cast<float>(pt.x), static_cast<float>(pt.y)};
@@ -286,6 +280,10 @@ sensor_msgs::msg::PointCloud2 PointCloudExtractor::extractPointCloudFromMask(
 void PointCloudExtractor::cameraInfoCallback(
   const sensor_msgs::msg::CameraInfo::SharedPtr msg)
 {
+  const int K_fx = 0;
+  const int K_cx = 2;
+  const int K_fy = 4;
+  const int K_cy = 5;
   camera_intrinsics_.width = msg->width;
   camera_intrinsics_.height = msg->height;
   camera_intrinsics_.ppx = msg->k[K_cx];
@@ -298,6 +296,7 @@ void PointCloudExtractor::cameraInfoCallback(
 
 void PointCloudExtractor::declareDefaultIntrinsics()
 {
+  // This camera information is for LuSNAR dataset
   camera_intrinsics_.width = 1024;
   camera_intrinsics_.height = 1024;
   camera_intrinsics_.ppx = 512.0;  // cx = width / 2
