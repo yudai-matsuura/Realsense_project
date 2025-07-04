@@ -19,14 +19,19 @@
 #define DEBUG_ENABLED false
 namespace lbr_arithmetic_average_roughness
 {
-constexpr float kVoxelSize = 0.01f; //[m]
-constexpr int kMeanK = 50; // Number of nearest neighbors to analyze
-constexpr float kStddevMulThresh = 1.5f; // Standard deviation multiplier threshold
 
 ArithmeticAverageRoughness::ArithmeticAverageRoughness(const rclcpp::NodeOptions & options)
 : rclcpp::Node("lbr_arithmetic_average_roughness", options)
 {
   std::cout << "ArithmeticAverageRoughness class is established." << std::endl;
+
+  // Get node name.
+  std::string topic_prefix = "/" + std::string(this->get_name());
+#if DEBUG_ENABLED
+  std::cout << "node_name = " << this->get_name() << std::endl;
+  std::cout << "topic_prefix = " << topic_prefix << std::endl;
+#endif  // DEBUG_ENABLED
+
   // Publisher
   marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/marker", 10);
 
@@ -95,13 +100,12 @@ void ArithmeticAverageRoughness::pointCloudCallback(const sensor_msgs::msg::Poin
   }
 
   // ****** Roughness Score ****** //
-  static int counter = 0;
+  static int roughness_counter = 0;
   float roughness_score = computeRoughnessScore(inlier_distances);
-  const int kPrintInterval = 10;
-  if (counter % kPrintInterval == 0) {
+  if (roughness_counter % kPrintInterval_ == 0) {
     std::cout << "Roughness score:" << roughness_score << std::endl;
   }
-  counter++;
+  roughness_counter++;
 
   // ****** Visualize ****** //
   publishPlaneMarker(centroid, normal, target_frame);
@@ -141,8 +145,12 @@ void ArithmeticAverageRoughness::slopePointCloudCallback(const sensor_msgs::msg:
     centroid, normal, target_frame, "world_normal", 0, 1.0f, 1.0f, 0.0f);
 
   // ****** Compute Angle ****** //
+  static int inclination_counter = 0;
   float angle = computeAngle(normal);
-  RCLCPP_INFO(this->get_logger(), "Inclination angle [deg]: %.2f", angle);
+  if (inclination_counter % kPrintInterval_ == 0) {
+    std::cout << "Inclination angle [deg]: " << angle << std::endl;
+  }
+  inclination_counter++;
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::preProcessingPointCloud(
@@ -191,6 +199,7 @@ sensor_msgs::msg::PointCloud2::SharedPtr ArithmeticAverageRoughness::transformPo
 pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
 {
   pcl::VoxelGrid<pcl::PointXYZ> sor;
+  const float kVoxelSize = 0.01f; //[m]
   sor.setInputCloud(cloud);
   sor.setLeafSize(kVoxelSize, kVoxelSize, kVoxelSize);
   pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>);
@@ -201,6 +210,8 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::downsamplePointC
 pcl::PointCloud<pcl::PointXYZ>::Ptr ArithmeticAverageRoughness::removeOutlierFromPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud)
 {
   pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+  const int kMeanK = 50; // Number of nearest neighbors to analyze
+  const float kStddevMulThresh = 1.5f; // Standard deviation multiplier threshold
   sor.setInputCloud(cloud);
   sor.setMeanK(kMeanK);
   sor.setStddevMulThresh(kStddevMulThresh);

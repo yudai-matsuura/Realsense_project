@@ -180,6 +180,7 @@ rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr slope_pointcloud_
 // Variables
 std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
 std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
+const int kPrintInterval_ = 10;
 };
 
 }  // namespace lbr_arithmetic_average_roughness
